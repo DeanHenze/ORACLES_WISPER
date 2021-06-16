@@ -4,19 +4,20 @@ Created on Sat Dec 19 13:09:33 2020
 
 @author: DeanH808
 
-Calibration of humidity dependence of isotope ratio measurements for Mako. 
+Fit calibration curve to humidity dependence of isotope ratio measurements. 
+This is done for both Picarros Mako and Gulper. 
 
-Fit the following function to calibration data:
+The calibration model is:
     a*(np.log(50000)-q)**b
 where q is humidity in ppmv, and a and b are fit parameters.
 
-There are three sets of calibration data, one for each ORACLES year. Fit the 
-above function to each of these sets.
+For Mako, there are three sets of calibration data, one for each ORACLES year. 
+The above model parameters are fitted separately for each year. For Gulper, 
+there is only calibration data for 2016. 
 """
 
 
 
-# Third party:
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -236,6 +237,8 @@ def run_calibrations():
     # Titles:
     axlist[0].set_title(r'Mako $\delta$D(q) calibrations', fontsize=12)
     axlist[1].set_title(r'Mako $\delta^{18}$O(q) calibrations', fontsize=12)
+    
+    plt.show()
     #--------------------------------------------------------------------------
   
 
@@ -264,6 +267,8 @@ def run_calibrations():
 
     ax1_G.set_title(r'Gulper $\delta$D(q) calibrations', fontsize=12)
     ax2_G.set_title(r'Gulper $\delta^{18}$O(q) calibrations', fontsize=12)
+    
+    plt.show()
     #--------------------------------------------------------------------------
     
 
