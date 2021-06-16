@@ -256,6 +256,14 @@ def run_calibrations():
     # Plot calibration curves:
     ax1_G.plot(q, qdep_model(logq, *results_df.loc[3, ['aD','bD']]), 'k-')
     ax2_G.plot(q, qdep_model(logq, *results_df.loc[3, ['a18O','b18O']]), 'k-')
+
+    # Figure labels:   
+    ax1_G.set_xlabel('q (ppmv)', fontsize=12) 
+    ax2_G.set_xlabel('q (ppmv)', fontsize=12)
+    ax1_G.set_ylabel(u' (\u2030)', fontsize=12)
+
+    ax1_G.set_title(r'Gulper $\delta$D(q) calibrations', fontsize=12)
+    ax2_G.set_title(r'Gulper $\delta^{18}$O(q) calibrations', fontsize=12)
     #--------------------------------------------------------------------------
     
 
