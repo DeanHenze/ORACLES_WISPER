@@ -57,10 +57,10 @@ calibration_results.xlsx table.
 def gulper_q_dependence_cal(overwrite='n'):
 
 # Load calibration data as pandas df:
-    relpath_data = ("..\\Calibration_Data\\"
-                    "Gulper_humidity-dependence_cals.xlsx" )
-    caldata = pd.read_excel(relpath_data, sheet_name=0, header=0, 
-                            usecols=np.arange(0,10))
+    relpath_data = ("gulper_humidity-dependence_cals.csv" )
+    caldata = pd.read_csv(relpath_data)
+    #caldata = pd.read_excel(relpath_data, sheet_name=0, header=0, 
+    #                        usecols=np.arange(0,10))
     
     
 # Drop some rows, add some columns:
