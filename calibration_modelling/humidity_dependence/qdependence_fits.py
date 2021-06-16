@@ -56,37 +56,43 @@ def qdep_model(logq, a, b):
 
 
 
-def fit_qdep(caldata):
+def fit_qdep(caldata, p0_D, bnds_D, p0_18O, bnds_18O):
     """
-    Fit the humidity dependence model (qdep_model) to calibration data. 
-    Return results (parameter fits and standard errors) as a dictionary.
+    Fit the humidity dependence model (qdep_model) to calibration data for 
+    dD and d18O, using scipy's curve_fit (non-linear least squares). 
     
-    caldata: pd.DataFrame. Calibration data. 
+    caldata: pd.DataFrame. Contains all calibration data: model input 
+        var log(humidity), isotope ratio delta measurements to fit the model 
+        with, and standard errors on the measurements.
+    
+    p0_D, bnds_D: Initial parameter values and paramter-space bounds for the 
+        dD fit (see scipy.optimize curve_fit docs).
+        
+    p0_18O, bnds_18O: Same as above but for d18O fit.
     """
     
-    # Get parameter fits and covariance matrix using scipy's curve_fit:
-    bnds = ([-30,0], [-0,10]) # Bounds on parameter values to try.      
+    # Get parameter fits and covariance matrix using scipy's curve_fit:        
     pfit_dD, pcov_dD = \
         curve_fit(qdep_model, caldata['log_h2o'], 
-                  caldata['dD*_permil'], p0=[-10, 1],
-                  method='trf', sigma=caldata['SE_dD'], bounds=bnds
+                  caldata['dD*_permil'], p0=p0_D,
+                  method='trf', sigma=caldata['dD_stderror'], bounds=bnds_D
                   )
     pfit_d18O, pcov_d18O = \
         curve_fit(qdep_model, caldata['log_h2o'], 
-                  caldata['d18O*_permil'], p0=[-1, 1],
-                  method='trf', sigma=caldata['SE_d18O'], bounds=bnds
+                  caldata['d18O*_permil'], p0=p0_18O,
+                  method='trf', sigma=caldata['d18O_stderror'], bounds=bnds_18O
                   )
 
     # Parameter standard errors computed from diagnal of covar matrix:
     sig_pars_dD = np.sqrt(np.diag(pcov_dD))
-    sig_pars_d18O = np.sqrt(np.diag(pcov_d18O))  
+    sig_pars_d18O = np.sqrt(np.diag(pcov_d18O))
     
 
     # Return results in a dictionary:
     keys = 'aD','bD','sig_aD','sig_bD','a18O','b18O','sig_a18O','sig_b18O'
     results = np.append(pfit_dD, [sig_pars_dD, pfit_d18O, sig_pars_d18O])
     return dict(zip(keys, results))
-         
+             
     
     
 def run_calibrations():
@@ -111,8 +117,8 @@ def run_calibrations():
     caldata_M['h2o_gkg'] = caldata_M['h2o_ppmv']*0.622/1000 # q in units g/kg.
     caldata_M['log_h2o'] = np.log(caldata_M['h2o_ppmv']) # log(q).
         # Add estimates of standard errors:
-    caldata_M['SE_dD'] = 5000/caldata_M['h2o_ppmv']
-    caldata_M['SE_d18O'] = 500/caldata_M['h2o_ppmv']
+    caldata_M['dD_stderror'] = 5000/caldata_M['h2o_ppmv']
+    caldata_M['d18O_stderror'] = 500/caldata_M['h2o_ppmv']
         # Drop any rows where the isotope measurements are NAN
     caldata_M.dropna(subset=['d18O*_permil','dD*_permil'], inplace=True)
     #--------------------------------------------------------------------------
@@ -123,9 +129,11 @@ def run_calibrations():
     # Load calibration data:
     caldata_G = pd.read_csv("gulper_humidity_dependence_cals.csv")
 
-    # Row/column additions, QC:
+    # Row/column mods, additions, QC:
     caldata_G['h2o_gkg'] = caldata_G['h2o_ppmv']*0.622/1000 # q in units g/kg.
     caldata_G['log_h2o'] = np.log(caldata_G['h2o_ppmv'])
+            # Date column as datetime64 type:
+    caldata_G['date'] = caldata_G['date'].astype('datetime64')
         # Remove rows for the 5/29 cal (looks like condensation in the tubes):
     caldata_G.loc[caldata_G['date']==np.datetime64('2017-05-29')] = np.nan
     caldata_G.dropna(subset=['d18O*_permil','dD*_permil'], inplace=True)
@@ -142,28 +150,34 @@ def run_calibrations():
     results_df['year'] = ['2016','2017','2018','2016']
     
     
-    # Fits for Mako for all 3 ORACLES years:
-        # Dateranges for Mako calibration data collection for each year:
+    # Fits for Mako for each ORACLES years:
+        # Dateranges for Mako calibration data collection for the 3 years:
     dateranges = [('2017-05-26', '2017-06-01'), ('2017-08-16', '2017-08-27'), 
                   ('2018-10-19', '2018-10-19')]
     
     parameter_colkeys = ['aD','bD','sig_aD','sig_bD','a18O',
                          'b18O','sig_a18O','sig_b18O']
+    
     for i in range(3):
         dr = dateranges[i]
         caldata_dates = get_caldata_dates(caldata_M, dr[0], dr[1])   
-
-        fitresults = fit_qdep(caldata_dates)
+                
+        fitresults = fit_qdep(caldata_dates, # This does the model fit. 
+                              p0_D = [-10, 1], bnds_D = ([-30,0], [0,10]), 
+                              p0_18O = [-1, 1], bnds_18O = ([-30,0], [0,10]))
+        
         results_df.loc[i, parameter_colkeys] = list(fitresults.values())
         
         
-    # The one Gulper fit:
-    fitresults_G = fit_qdep(caldata_G)
+    # The one Gulper fit:     
+    fitresults_G = fit_qdep(caldata_G,
+                            p0_D = [1, 1], bnds_D = ([0,-10], [30,10]), 
+                            p0_18O = [0.1, 1], bnds_18O = ([0,-10], [30,10]))
     results_df.loc[3, parameter_colkeys] = list(fitresults_G.values())        
     #--------------------------------------------------------------------------
 
 
-    ## Plot Mako calibration data and fit curves for each ORACLES year:
+    ## Plot Mako calibration data and fit curves:
     #--------------------------------------------------------------------------
     plt.figure()
     axlist = []
@@ -235,8 +249,35 @@ def run_calibrations():
     axlist[1].set_title(r'Mako $\delta^{18}$O(q) calibrations', fontsize=12)
     #--------------------------------------------------------------------------
   
+
+    ## Plot Gulper calibration data and fit curves:
+    #--------------------------------------------------------------------------
+    plt.figure()
+    ax1_G = plt.subplot(1,2,1); ax2_G = plt.subplot(1,2,2)
+
+    # Scatter plot of cal data. Plot separate cal runs in different colors:
+    for datetime_obj, data in caldata_G.groupby('date'):
+        
+        ax1_G.scatter(data['h2o_ppmv'], data['dD*_permil'], s=10,  
+                    label=str(datetime_obj.date()))
+        ax2_G.scatter(data['h2o_ppmv'], data['d18O*_permil'], s=10, 
+                    label=str(datetime_obj.date()))
+        
+        
+    # Plot calibration curves:
+    ax1_G.plot(q, qdep_model(logq, *results_df.loc[3, ['aD','bD']]), 'k-')
+    ax2_G.plot(q, qdep_model(logq, *results_df.loc[3, ['a18O','b18O']]), 'k-')
+        
+    #q = np.linspace(500, 18000, 1000) # Units of ppmv
+    #logq = np.log(q)
+
+    #ax1.plot(q, qdep_fitcurve(logq, *results.loc[0, ['aD','bD']]), 'k-')
+    #ax2.plot(q, qdep_fitcurve(logq, *results.loc[0, ['a18O','b18O']]), 'k-')
+    #--------------------------------------------------------------------------
+    
+
     """    
-# Print fit results and save fits to a xlsx file:
+# Print fit results and save fits to an xlsx file:
     for col in results.columns:
         if col=='year': continue
         if col in ['a18O','sig_a18O']:
