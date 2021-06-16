@@ -59,7 +59,8 @@ def qdep_model(logq, a, b):
 def fit_qdep(caldata, p0_D, bnds_D, p0_18O, bnds_18O):
     """
     Fit the humidity dependence model (qdep_model) to calibration data for 
-    dD and d18O, using scipy's curve_fit (non-linear least squares). 
+    dD and d18O, using scipy's curve_fit (non-linear least squares). Returns 
+    parameter fits and standard errors for dD and d18O in a single dictionary.
     
     caldata: pd.DataFrame. Contains all calibration data: model input 
         var log(humidity), isotope ratio delta measurements to fit the model 
@@ -209,8 +210,7 @@ def run_calibrations():
     #--------------------------------------------------------------------------    
 
 
-
-    ## Plot axes labels, mods, limits:
+    ## Tidy up Mako plot for publication:
     #--------------------------------------------------------------------------
     xlim = (350, 23000) # x limits for all axes.
     for i in range(3):
@@ -232,18 +232,7 @@ def run_calibrations():
     for i in range(4): axlist[i].set_xticks([])
     axlist[4].set_xlabel('q (ppmv)', fontsize=12) 
     axlist[5].set_xlabel('q (ppmv)', fontsize=12)
-    
-    # Second x-axis for q units of g/kg:
-    #cf = (0.622/1000) # Conversion factor
-    #ax5twin = axlist[4].twiny(); ax6twin = axlist[5].twiny()
-    #ax5twin.set_xlim(xlim)
-    #xticks = axlist[4].get_xticks()
-    #xticklabels = axlist[4].get_xticklabels()
-    #ax5twin.set_xticks(xticks)
-    #ax5twin.set_xticklabels(cf*xticks)
-    #ax5twin.xaxis.set_ticks_position('bottom') # set the position of the second x-axis to bottom
-    #ax5twin.spines['bottom'].set_position(('outward', 20))
-    
+        
     # Titles:
     axlist[0].set_title(r'Mako $\delta$D(q) calibrations', fontsize=12)
     axlist[1].set_title(r'Mako $\delta^{18}$O(q) calibrations', fontsize=12)
@@ -267,34 +256,12 @@ def run_calibrations():
     # Plot calibration curves:
     ax1_G.plot(q, qdep_model(logq, *results_df.loc[3, ['aD','bD']]), 'k-')
     ax2_G.plot(q, qdep_model(logq, *results_df.loc[3, ['a18O','b18O']]), 'k-')
-        
-    #q = np.linspace(500, 18000, 1000) # Units of ppmv
-    #logq = np.log(q)
-
-    #ax1.plot(q, qdep_fitcurve(logq, *results.loc[0, ['aD','bD']]), 'k-')
-    #ax2.plot(q, qdep_fitcurve(logq, *results.loc[0, ['a18O','b18O']]), 'k-')
     #--------------------------------------------------------------------------
     
 
-    """    
-# Print fit results and save fits to an xlsx file:
-    for col in results.columns:
-        if col=='year': continue
-        if col in ['a18O','sig_a18O']:
-            results.loc[:,col] = results.loc[:,col].round(decimals=5)
-        else:
-            results.loc[:,col] = results.loc[:,col].round(decimals=3)
-    
-    print('===========\nFit Results\n===========')
-    print(results)
-    
-    relpath_caltable = r'../Calibration_Data/calibration_fits.xlsx' 
-    """
-#    if overwrite=='y':
-#        add_excel_sheet(relpath_caltable, results, 'Mako_delta(q)')
-#        print('Results written to excel file.')
-#    else:
-#        print('Results not written to excel file.')
+    ## Save fit results to csv file:
+    results_df.to_csv("qdependence_fit_results.csv", index=False)
+
         
 
 if __name__=='__main__':
