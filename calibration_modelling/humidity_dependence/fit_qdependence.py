@@ -67,10 +67,8 @@ def fit_qdep(caldata, p0_D, bnds_D, p0_18O, bnds_18O):
         var log(humidity), isotope ratio delta measurements to fit the model 
         with, and standard errors on the measurements.
     
-    p0_D, bnds_D: Initial parameter values and paramter-space bounds for the 
-        dD fit (see scipy.optimize curve_fit docs).
-        
-    p0_18O, bnds_18O: Same as above but for d18O fit.
+    p0_D, bnds_D, p0_18O, bnds_18O: Initial parameter values and paramter-space 
+        bounds for fitting algorithm.
     """
     
     # Get parameter fits and covariance matrix using scipy's curve_fit:        
@@ -181,7 +179,7 @@ def run_calibrations():
 
     ## Plot Mako calibration data and fit curves:
     #--------------------------------------------------------------------------
-    plt.figure()
+    fig1 = plt.figure(figsize=(6.5,4))
     axlist = []
         # Separate axes for each daterange and for each isotopologue:
     for i in range(6): axlist.append(plt.subplot(3,2,i+1))    
@@ -202,7 +200,7 @@ def run_calibrations():
             
     
     # Calibration curves:
-    q = np.linspace(500, 18000, 100) # Get model output for these humidities, ppmv.
+    q = np.linspace(600, 18000, 100) # Get model output for these humidities, ppmv.
     logq = np.log(q)
 
     for i in range(3):
@@ -217,8 +215,8 @@ def run_calibrations():
     for i in range(3):
     # Axes limits and scale:
         axlist[2*i].set_xscale("log"); axlist[2*i+1].set_xscale("log")
-        axlist[2*i].set_xlim(xlim); axlist[2*i].set_ylim(-60, 3)        
-        axlist[2*i+1].set_xlim(xlim); axlist[2*i+1].set_ylim(-16, 1)
+        axlist[2*i].set_xlim(xlim); axlist[2*i].set_ylim(-45, 3)        
+        axlist[2*i+1].set_xlim(xlim); axlist[2*i+1].set_ylim(-10, 1)
             
     # y-labels/ticks and positions:
         axlist[2*i].set_ylabel(r'$\delta$D'+u' (\u2030)', fontsize=12)
@@ -227,16 +225,21 @@ def run_calibrations():
         axlist[2*i+1].yaxis.tick_right()
         axlist[2*i+1].set_yticks([0,-5,-10])
 
-        axlist[2*i].legend()
+        axlist[2*i].legend(fontsize=8, loc='lower right')
 
     # x-labels:   
     for i in range(4): axlist[i].set_xticks([])
-    axlist[4].set_xlabel('q (ppmv)', fontsize=12) 
-    axlist[5].set_xlabel('q (ppmv)', fontsize=12)
+    axlist[4].set_xlabel('q (ppmv)', fontsize=12, labelpad=0) 
+    axlist[5].set_xlabel('q (ppmv)', fontsize=12, labelpad=0)
         
     # Titles:
     axlist[0].set_title(r'Mako $\delta$D(q) calibrations', fontsize=12)
     axlist[1].set_title(r'Mako $\delta^{18}$O(q) calibrations', fontsize=12)
+    
+    # Figure sublabels:
+    fig1.text(0.515, 0.85, '(a)', fontsize=18, ha='center', va='center')
+    fig1.text(0.515, 0.58, '(b)', fontsize=18, ha='center', va='center')
+    fig1.text(0.515, 0.31, '(c)', fontsize=18, ha='center', va='center')
     
     plt.show()
     #--------------------------------------------------------------------------
@@ -244,7 +247,7 @@ def run_calibrations():
 
     ## Plot Gulper calibration data and fit curves:
     #--------------------------------------------------------------------------
-    plt.figure()
+    fig2 = plt.figure()
     ax1_G = plt.subplot(1,2,1); ax2_G = plt.subplot(1,2,2)
 
     # Scatter plot of cal data. Plot separate cal runs in different colors:
@@ -272,9 +275,10 @@ def run_calibrations():
     #--------------------------------------------------------------------------
     
 
-    ## Save fit results to csv file:
+    ## Save fit results to csv file and figures to .png files:
     results_df.to_csv("qdependence_fit_results.csv", index=False)
-
+    fig1.savefig("qdep_fit_results_Mako.png")
+    fig2.savefig("qdep_fit_results_Gulper.png")
         
 
 if __name__=='__main__':
