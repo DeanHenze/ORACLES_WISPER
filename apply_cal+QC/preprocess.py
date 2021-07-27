@@ -11,12 +11,14 @@ For 2016 ORACLES flights:
 ------------------------
     - Take the subset of variables from the raw data to be used in the 
       final ESPO files.
-    - Process to 1 Hz frequency.   
+    - Process to 1 Hz frequency. 
+    - Check that there is a full set of timestamps and at 1 Hz. 
     - Mask outlying data with flagged value -9999.
     
 For 2017 and 2018 ORACLES flights:
+(Data have already been processed to 1 Hz frequency)
 ----------------------------------
-    - Data have already been processed to 1 Hz frequency. 
+    - Check that there is a full set of timestamps and at 1 Hz. 
     - Take the subset of variables from the raw data to be used in the 
       final ESPO files. 
     - separate Pic1 data into separate columns for CVI measurements and 
@@ -28,6 +30,11 @@ For 2017 and 2018 ORACLES flights:
 
 Note that for 2017 and 2018, what I am calling Pic1(Pic2) vars in this script 
 are labelled as pic0(pic1) vars in the raw files.
+
+The data are masked in two ways. First, there are several automated flagging 
+criteria hardcoded in this script. Second, there are .txt files where I 
+have manually looked through the data and recorded intervals of clearly bad 
+data. This script reads the intervals in from those files and masks them.
 """
 
 
@@ -53,31 +60,170 @@ class Preprocessor(object):
     
     Parameters
     ----------
-    rawdata: str or pandas.core.frame.DataFrame.
-        If a str, should be a date of the form 'yyyymmdd'. In this case, 
-        the corresponding raw datafile will be loaded into a pandas df and 
-        assigned as the attribute. If rawdata is already a pandas df, it is 
-        assigned directly.
+    date: str.
+        ORACLES flight date "yyyymmdd" for the datafile.
+        
+    rawdata: optional, pandas.core.frame.DataFrame.
+        The raw dataset for the appropriate flight date. If passed, rawdata is 
+        assigned directly. Otherwise, the raw datafile will be loaded into a 
+        pandas df and assigned during __init__. 
         
     writeloc: str
-        Path (relative or absolute) to 
+        Path (relative or absolute) to save the preprocessed data to.
     """
     
     
-    def __init__(self, rawdata, writeloc=""):
+    def __init__(self, date, rawdata=None, writeloc=""):
         
-        # If str passed, load the datafile as pandas df:
-        if type(rawdata)==str:
+        # If a pandas df was already passed:
+        if type(rawdata)==pd.core.frame.DataFrame:
+            self.rawdata = rawdata
+            
+        # If no df passed, load the datafile as pandas df using 'date':
+        elif rawdata is None:
             fname_raw = 'WISPER_'+date+'_rawField.ict'
             if date[:4]=='2016': header=37
             if date[:4]=='2017': header=0
             self.rawdata = pd.read_csv(r"./WISPER_raw_data/" + fname_raw, 
-                                       header=header)
-        # Else a pandas df was already passed:
-        elif type(rawdata)==pd.core.frame.DataFrame:
-            self.rawdata = rawdata
+                                       header=header)            
             
+        self.date = date
         self.writeloc = writeloc
+        
+        
+    def preprocess_2016file(self):
+        """
+        Full preprocessing of a 2016 file, as outlined in this script header. 
+        Processed data added as new attribute "preprodata".
+        """
+        
+        self.preprodata = self.rawdata.copy()
+        preprodata = self.preprodata
+        
+
+        ## Keep only a subset of the vars: 
+            
+        preprodata.drop([' pressure_cavity',' temp_cavity',' temp_das','t_ref'],
+                        axis=1, inplace=True)
+            # Rename remaining vars to be consistent with the other two years:
+        preprodata.columns=['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']        
+
+
+        ## Get data into 1 Hz frequency:
+            
+        # a) group/average timestamps within the same second:
+        preprodata.loc[:,'Start_UTC'] = preprodata['Start_UTC'].round(0)    
+        preprodata = preprodata.groupby(by='Start_UTC', as_index=False).mean()
+    
+        # b) Interpolate any 1 Hz gaps: 
+            # Full set of reference timestamps at 1Hz:
+        t0 = preprodata.iloc[0]['Start_UTC']
+        tf = preprodata.iloc[-1]['Start_UTC']
+        t_ref = pd.DataFrame({'t_ref':np.arange(t0,tf+1,1)}) 
+            # merge data with reference to get rows of NANs where needed:
+        preprodata = preprodata.merge(t_ref, how='outer', left_on='Start_UTC', 
+                                      right_on='t_ref',sort=True)   
+            # Use pandas to interpolate on NAN rows:
+        preprodata.interpolate(method='linear', axis=0, limit=3, inplace=True)
+
+        # c) Check that timestamps are complete and at 1 Hz:
+        self.timestamp_checker(preprodata)
+        
+        
+        ## Mask bad data intervals recorded in the .txt files:
+            
+        
+    
+    def timestamp_checker(self, data):
+        """
+        Check that the timestamps column is 1 Hz with no missing times. 
+        Perform the following checks:
+           1) The number of rows in data1 is equal to tf-t0+1, 
+           2) The number of non-nan values in 'Start_UTC' is equal to tf-t0+1, 
+           3) The time difference between adjacent rows is 1s for every row.
+    
+        For future readers: this function was not written very well, so if 
+        you are confused it is my fault not yours. It does the job though.
+        """
+        
+        utc = 'Start_UTC'
+    
+        t0 = data.iloc[0][utc]
+        tf = data.iloc[-1][utc]
+        t_ref = np.arange(t0,tf+1,1)
+
+        # 1):
+        dt = np.array(data.iloc[1:][utc]) - np.array(data.iloc[:-1][utc])
+        n_full = np.size(data,0)
+        bool_full = ( n_full == (tf-t0+1) )
+        # 2):
+        n_nonan = np.sum(pd.notnull(data[utc]))
+        bool_nonan = ( n_nonan == (tf-t0+1) )
+        # 3):
+        n_dt_ls1 = np.size(np.where(dt<1),1)
+        n_dt_gt1 = np.size(np.where(dt>1),1)
+        bool_dt = ( (n_dt_ls1+n_dt_gt1) == 0 ) 
+        
+        if bool_dt and bool_full and bool_nonan:
+            print("Completed time averaging/interpolation to 1 Hz "
+                  " without needing modifications.")     
+        
+        else:
+        # If any of the tests fail:
+            print('Modification to time variable needed.')
+            print('\t tf-t0+1 = '+str(tf-t0+1))
+            print('\t Number of rows in 1s-averaged data after NAN filling = '
+                  +str(n_full))
+            print('\t Number of non-nan values in \'Start_UTC\' = '
+                  +str(n_nonan))
+            print('\t Number adjacent rows where dt is not 1s AND neither of '
+                  'the rows has a NAN timestamp= '+str(n_dt_ls1+n_dt_gt1))
+            
+            if bool_full and bool_dt:
+            # In this case the averaging/interpolation worked and there were 
+            # just some intervals > 3 s with missing data. Replace the time 
+            # column with 't_ref':   
+                print('\t Filling in missing timestamps but keeping missing value'
+                      ' flags for other WISPER vars. Good to go!')
+                data.loc[:,'Start_UTC'] = t_ref
+
+
+    def mask_from_txtfiles(self, data, varkeys_mask):
+        """
+        There are .txt files where I have manually recorded intervals of 
+        clearly bad data. This fxn masks the data in those intervals.
+        
+        data: handle to the pandas df to mask.
+        
+        varkeys_mask (list of str's): keys of the df columns to apply mask to.
+        """
+
+        # Load file with recorded intervals of bad data. Load as pandas df:
+        path_badintvls_txt = ("./outlier_time_intervals/Outlier_Times_%s.txt" 
+                              % self.date)
+        t_badintvls = pd.read_csv(path_badintvls_txt, header=0)
+        
+        # Each row contains start/end times for a bad data interval:
+        for i,row in t_badintvls.iterrows():
+            if row['Start']==0: 
+                data.loc[:row['End'], varkeys_mask] = np.nan
+            else:
+                data.loc[row['Start']:row['End'], varkeys_mask] = np.nan
+
+
+    def flag_na_switch(self, data, flag_9999=False, nan=False):
+        """
+        Fill NAN's in data with the missing value flag "-9999" or vise versa.
+        """
+
+        if flag_9999: 
+            data.replace(-9999.0, np.nan, inplace=True)
+        if nan: 
+            data.fillna(-9999, inplace=True)    
+            data.replace(np.inf,-9999, inplace=True)
+            data.replace(-np.inf,-9999, inplace=True)
+
+
 
 
 
@@ -93,7 +239,7 @@ def dataprep_16(date):
     global path_wisper_raw_dir, path_wisper_prep_dir
     global path_outlier_tintvls_dir
     
-    
+    """
     # Load WISPER data and fill -9999 missing values with np.nan:
     fname_raw = 'WISPER_'+date+'_rawField.ict'
     data0 = pd.read_csv(path_wisper_raw_dir + fname_raw, header=37)
@@ -157,7 +303,7 @@ def dataprep_16(date):
     data1.drop([' pressure_cavity', ' temp_cavity', ' temp_das', 't_ref'],
                axis=1, inplace=True)
     data1.columns=['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']
-    
+    """
     
     # Mask outlying data time intervals from the .txt files:
     t_outlier = pd.read_csv(path_outlier_tintvls_dir + 
@@ -328,7 +474,7 @@ def dataprep_17_18(date):
     data1.to_csv(path_wisper_prep_dir + fname_prep, index=False)
 
 
-
+"""
 if __name__=='__main__':
 ##_____________________________________________________________________________
 ## ORACLES research flight dates for days where WISPER took good data:
@@ -356,4 +502,4 @@ if __name__=='__main__':
           "Raw data preparation complete\n"
           "=============================")
 ##_____________________________________________________________________________
-    
+"""   
