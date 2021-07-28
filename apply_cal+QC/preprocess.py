@@ -44,6 +44,7 @@ import os
 # Third party:
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 path_wisper_raw_dir = r"./WISPER_raw_data/"
@@ -91,25 +92,33 @@ class Preprocessor(object):
         self.writeloc = writeloc
         
         
-    def preprocess_2016file(self):
+    def preprocess_2016file(self, save_output=False):
         """
         Full preprocessing of a 2016 file, as outlined in this script header. 
-        Processed data added as new attribute "preprodata".
+        Processed data is added as new attribute "preprodata". If "save_output" 
+        is set to True, the preprocessed data is saved to path "writeloc".
         """
         
-        self.preprodata = self.rawdata.copy()
-        preprodata = self.preprodata
+        print("Preprocessing data for ORACLES flight date %s" % self.date)
+        
+        #self.preprodata = self.rawdata.copy()
+        #preprodata = self.preprodata
+        preprodata = self.rawdata.copy()
         
 
-        ## Keep only a subset of the vars: 
+        ## Keep only a subset of the vars:
+        ## -------------------------------
             
-        preprodata.drop([' pressure_cavity',' temp_cavity',' temp_das','t_ref'],
+        preprodata.drop([' pressure_cavity',' temp_cavity',' temp_das'],
                         axis=1, inplace=True)
-            # Rename remaining vars to be consistent with the other two years:
-        preprodata.columns=['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']        
+            # Rename some vars to be consistent with the other two years:
+        keys_old = [' H2O_ppmv',' dD_permil',' d18O_permil']
+        keys_new = ['h2o_tot2','dD_tot2','d18O_tot2']
+        preprodata.rename(columns=dict(zip(keys_old, keys_new)), inplace=True)
 
 
         ## Get data into 1 Hz frequency:
+        ## -----------------------------
             
         # a) group/average timestamps within the same second:
         preprodata.loc[:,'Start_UTC'] = preprodata['Start_UTC'].round(0)    
@@ -126,12 +135,22 @@ class Preprocessor(object):
             # Use pandas to interpolate on NAN rows:
         preprodata.interpolate(method='linear', axis=0, limit=3, inplace=True)
 
-        # c) Check that timestamps are complete and at 1 Hz:
+        # c) Check that timestamps are complete and at 1 Hz, then drop 't_ref':
         self.timestamp_checker(preprodata)
+        preprodata.drop(['t_ref'], axis=1, inplace=True)        
         
         
-        ## Mask bad data intervals recorded in the .txt files:
-            
+        ## Assign NAN to bad data intervals recorded in the .txt files:
+        ## -----------------------------
+        self.applyna_from_txtfiles(preprodata)
+        
+        
+        ## Assign attribute and optional save:
+        ## ----------------------------------
+        self.preprodata = preprodata
+        if save_output:
+            self.flag_na_switch(preprodata, flag_9999=True)
+            self.preprodata.to_csv(self.writeloc, index=False)
         
     
     def timestamp_checker(self, data):
@@ -188,28 +207,51 @@ class Preprocessor(object):
                 data.loc[:,'Start_UTC'] = t_ref
 
 
-    def mask_from_txtfiles(self, data, varkeys_mask):
+    def applyna_from_txtfiles(self, data):
         """
         There are .txt files where I have manually recorded intervals of 
-        clearly bad data. This fxn masks the data in those intervals.
+        clearly bad data. This fxn sets the data in those intervals to NAN for 
+        the appropriate variable columns.
         
         data: handle to the pandas df to mask.
-        
-        varkeys_mask (list of str's): keys of the df columns to apply mask to.
         """
 
-        # Load file with recorded intervals of bad data. Load as pandas df:
-        path_badintvls_txt = ("./outlier_time_intervals/Outlier_Times_%s.txt" 
-                              % self.date)
-        t_badintvls = pd.read_csv(path_badintvls_txt, header=0)
-        
-        # Each row contains start/end times for a bad data interval:
-        for i,row in t_badintvls.iterrows():
-            if row['Start']==0: 
-                data.loc[:row['End'], varkeys_mask] = np.nan
-            else:
-                data.loc[row['Start']:row['End'], varkeys_mask] = np.nan
+        d = self.date
+        p_txtfiledir = r"./outlier_time_intervals/%s/" % d[:4]
 
+        def apply_nan(t_badintvls, varkeys):
+            """
+            Assigns NAN to intervals in "data" (for the columns in 
+            "varkeys") contained in "t_badintvls" (pandas df). 
+            """
+            for i,row in t_badintvls.iterrows():
+            # Each row contains start/end times for a bad data interval:
+                if row['Start']==0: 
+                    data.loc[:row['End'], varkeys] = np.nan
+                else:
+                    data.loc[row['Start']:row['End'], varkeys] = np.nan
+
+
+        if d[0:4] == '2016':
+        # For 2016, only one .txt file to load for each flight:  
+            path_txt = p_txtfiledir + "Pic2_Outlier_Times_" + d + ".txt"
+            t_badintvls = pd.read_csv(path_txt, header=0)
+            apply_nan(t_badintvls, ['h2o_tot2','dD_tot2','d18O_tot2'])
+        
+        
+        if d[0:4] in  ['2017','2018']:
+        # For other years, for each flight there are separate .txt files for 
+        # _tot1, _tot2, and _cld vars:
+            varkeys_list = [['h2o_tot1','dD_tot1','d18O_tot1'],
+                            ['h2o_cld','dD_cld','d18O_cld','cvi_lwc'],
+                            ['h2o_tot2','dD_tot2','d18O_tot2']]
+            fname_list = ["Pic1_Tot_Outlier_Times_" + d + ".txt",
+                          "Pic1_Cld_Outlier_Times_" + d + ".txt",
+                          "Pic2_Outlier_Times_" + d + ".txt"]
+            for varkeys, f in zip(varkeys_list, fname_list):
+                t_badintvls = pd.read_csv(p_txtfiledir + f, header=0)
+                apply_nan(t_badintvls, varkeys)
+        
 
     def flag_na_switch(self, data, flag_9999=False, nan=False):
         """
@@ -222,7 +264,26 @@ class Preprocessor(object):
             data.fillna(-9999, inplace=True)    
             data.replace(np.inf,-9999, inplace=True)
             data.replace(-np.inf,-9999, inplace=True)
+            
+            
+    def test_plots_2016(self):
+        
+        rawdata = self.rawdata
+        preprodata = self.preprodata
+        
+        plt.figure()
+        ax1 = plt.subplot(3,1,1)
+        ax2 = plt.subplot(3,1,2)
+        ax3 = plt.subplot(3,1,3)
+        
+        ax1.plot(rawdata['Start_UTC'], rawdata[' H2O_ppmv'], 'k-')
+        ax1.plot(preprodata['Start_UTC'], preprodata['h2o_tot2'], 'ro')
 
+        ax2.plot(rawdata['Start_UTC'], rawdata[' dD_permil'], 'k-')
+        ax2.plot(preprodata['Start_UTC'], preprodata['dD_tot2'], 'ro')
+        
+        ax3.plot(rawdata['Start_UTC'], rawdata[' d18O_permil'], 'k-')
+        ax3.plot(preprodata['Start_UTC'], preprodata['d18O_tot2'], 'ro')
 
 
 
@@ -303,7 +364,7 @@ def dataprep_16(date):
     data1.drop([' pressure_cavity', ' temp_cavity', ' temp_das', 't_ref'],
                axis=1, inplace=True)
     data1.columns=['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']
-    """
+    
     
     # Mask outlying data time intervals from the .txt files:
     t_outlier = pd.read_csv(path_outlier_tintvls_dir + 
@@ -323,7 +384,7 @@ def dataprep_16(date):
     data1.fillna(-9999, inplace=True)    
     fname_prep = 'WISPER_' + date + '_basic-prep.ict'
     data1.to_csv(path_wisper_prep_dir + fname_prep, index=False)
-
+    """
 
 
 def dataprep_17_18(date):    
