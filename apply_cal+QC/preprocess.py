@@ -23,8 +23,7 @@ For 2017 and 2018 ORACLES flights:
       final ESPO files. 
     - separate Pic1 data into separate columns for CVI measurements and 
       SDI measurements.
-    - Calculate some CVI/WISPER system air flow variables and include as
-      new columns.
+    - Calculate additional CVI/WISPER system flow quantities.
     - Convert timestamps from date-time to UTC-seconds.
     - Mask outlying data with flagged value -9999.
 
@@ -82,9 +81,12 @@ class Preprocessor(object):
             
         # If no df passed, load the datafile as pandas df using 'date':
         elif rawdata is None:
-            fname_raw = 'WISPER_'+date+'_rawField.ict'
-            if date[:4]=='2016': header=37
-            if date[:4]=='2017': header=0
+            if date[:4]=='2016': 
+                header=37
+                fname_raw = 'WISPER_'+date+'_rawField.ict'
+            if date[:4] in ['2017','2018']: 
+                header=0
+                fname_raw = 'WISPER_'+date+'_rawField.dat'
             self.rawdata = pd.read_csv(r"./WISPER_raw_data/" + fname_raw, 
                                        header=header)            
             
@@ -100,10 +102,9 @@ class Preprocessor(object):
         """
         
         print("Preprocessing data for ORACLES flight date %s" % self.date)
-        
-        #self.preprodata = self.rawdata.copy()
-        #preprodata = self.preprodata
+
         preprodata = self.rawdata.copy()
+        self.flag_na_switch(preprodata, nan=True)
         
 
         ## Keep only a subset of the vars:
@@ -286,106 +287,78 @@ class Preprocessor(object):
         ax3.plot(preprodata['Start_UTC'], preprodata['d18O_tot2'], 'ro')
 
 
-
-
-def dataprep_16(date):
-    """
-    Process a raw data file for 2016.
+    def preprocess_20172018file(self, save_output=False):
+        """
+        Full preprocessing of a 2017 or 2018 file, as outlined in this script 
+        header. Processed data is added as new attribute "preprodata". If 
+        "save_output" is set to True, the preprocessed data is saved to path 
+        "writeloc".
+        """
         
-    date (str) 'yyyymmdd'. flight date.
-    """    
-   
-    print('Preparing data for %s' % date)
-
-    global path_wisper_raw_dir, path_wisper_prep_dir
-    global path_outlier_tintvls_dir
-    
-    """
-    # Load WISPER data and fill -9999 missing values with np.nan:
-    fname_raw = 'WISPER_'+date+'_rawField.ict'
-    data0 = pd.read_csv(path_wisper_raw_dir + fname_raw, header=37)
-    data0.replace(-9999.0, np.nan, inplace=True)
+        print("Preprocessing data for ORACLES flight date %s" % self.date)
+        
+        preprodata = self.rawdata.copy()
 
 
-    # Group/average data faster than 1Hz. This is done by first rounding the
-    # time variable to the nearest integer, then averaging over any duplicate
-    # time stamps:
-    data0.loc[:,'Start_UTC'] = data0['Start_UTC'].round(decimals=0)
-    data1 = data0.groupby(by='Start_UTC', as_index=False).mean()
+        ## Keep only a subset of the vars:
+        ## -------------------------------
+            
+        varskeep = ['timestamp','pic0_qh2o','pic0_deld','pic0_delo',
+                    'pic1_qh2o','pic1_deld','pic1_delo','state_valve',
+                    'cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm',]
+        preprodata = preprodata[varskeep]
 
+        self.flag_na_switch(preprodata, nan=True)
+        cvivars = ['cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm']
+        preprodata.loc[:,cvivars].replace(-99.0, np.nan, inplace=True)
+        
 
-    # Interpolate data slower than 1Hz. 
-        # First and last time stamps:
-    t0 = data0.iloc[0]['Start_UTC']; tf = data0.iloc[-1]['Start_UTC']
-        # Make a full set of timestamps @ 1Hz (reference time):
-    t_ref = pd.DataFrame({'t_ref':np.arange(t0,tf+1,1)})
-        # merge data with reference time to get rows of NANs where needed:
-    data1 = data1.merge(t_ref, how='outer', left_on='Start_UTC', 
-                        right_on='t_ref',sort=True)   
-        # Use pandas interpolate on NAN rows:
-    data1.interpolate(method='linear', axis=0, limit=3, inplace=True)
+        ## In a new dataframe, restructure pic0 data so that SDI and CVI inlet 
+        ## measurements are separate columns:
+        ## -------------------------------
 
-
-    # Verify that everything went well with averaging and interpolation. Check:
-    #   1) The number of rows in data1 is equal to tf-t0+1, 
-    #   2) The number of non-nan values in 'Start_UTC' is equal to tf-t0+1, 
-    #   3) The time difference between adjacent rows is 1s for every row. 
-    dt = np.array(data1.iloc[1:]['Start_UTC']) - np.array(data1.iloc[:-1]['Start_UTC'])
-    n_full = np.size(data1,0)
-    bool_full = ( n_full == (tf-t0+1) )
-    n_nonan = np.sum(pd.notnull(data1['Start_UTC']))
-    bool_nonan = ( n_nonan == (tf-t0+1) )
-    n_dt_ls1 = np.size(np.where(dt<1),1); n_dt_gt1 = np.size(np.where(dt>1),1)
-    bool_dt = n_dt_ls1+n_dt_gt1==0
-    
-    if bool_dt and bool_full and bool_nonan:
-        print('Completed time variable averaging/interpolation for flight on '+date+
-              ' without needing modifications.')     
-    # If any of the tests (1)-(3) fail, replace the data in the 'Start_UTC' 
-    # column with that from the 't_ref' column:
-    else:
-        print('Modification to time variable needed for flight on '+date+'.')
-        print('\t tf-t0+1 = '+str(tf-t0+1))
-        print('\t Number of rows in 1s-averaged data after NAN filling = '+str(n_full))
-        print('\t Number of non-nan values in \'Start_UTC\' = '+str(n_nonan))
-        print('\t Number adjacent rows where dt is not 1s AND neither of the rows'
-              ' has a NAN timestamp= '+str(n_dt_ls1+n_dt_gt1))
-        # If bool_dt==True, then the averaging/interpolation worked and there
-        # are just some time intervals with missing data. So just replace the 
-        # time column with 't_ref':
-        if bool_dt:
-            print('\t Filling in missing timestamps but keeping missing value'
-                  ' flags for other WISPER vars. Good to go!')
-            data1.loc[:,'Start_UTC'] = data1['t_ref'][:]
-    
-
-    # Keep only a subset of the vars. Rename them for consistency with the 
-    # other two ORACLES years:
-    data1.drop([' pressure_cavity', ' temp_cavity', ' temp_das', 't_ref'],
-               axis=1, inplace=True)
-    data1.columns=['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']
+            # split original dataframe Pic1 variables:
+        pic1_varkeys_raw = ['pic0_qh2o','pic0_deld','pic0_delo']
+        pic1_SDI = data0.loc[data0['state_valve']==0, pic1_varkeys_raw]    
+        pic1_CVI = data0.loc[data0['state_valve']==1, pic1_varkeys_raw]
+            # Rename columns:
+        pic1_varkeys_tot = ['h2o_tot1','dD_tot1','d18O_tot1']
+        pic1_SDI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_tot)), 
+                        inplace=True)
+        pic1_varkeys_cld = ['h2o_cld','dD_cld','d18O_cld']
+        pic1_CVI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_cld)), 
+                        inplace=True)
+            # Recombine to get restructured frame:
+        data1 = pd.merge(pic1_SDI, pic1_CVI, how='outer', left_index=True, 
+                     right_index=True)
+        
+        
+        
+        data1['cvi_enhance'] = data0['cvi_enhancement']
+    data1['cvi_dcut50'] = data0['cvi_dcut50']
+    data1['cvi_lwc'] = data0['cvi_lwc']
+    data1['cvi_userFlow'] = data0['f_user_slpm'] 
+    data1['wisper_valve_state'] = data0['state_valve']
     
     
-    # Mask outlying data time intervals from the .txt files:
-    t_outlier = pd.read_csv(path_outlier_tintvls_dir + 
-                            r"2016/Outlier_Times_"+date+".txt", 
-                            header=0) # Load file for outlying time intervals.
+        
 
-    vars_mask=['h2o_tot2','dD_tot2','d18O_tot2']
-    data1.set_index('Start_UTC', drop=False, inplace=True)    
-    for i,row in t_outlier.iterrows():
-        if row['Start']==0: 
-            data1.loc[:row['End'], vars_mask] = np.nan
-        else:
-            data1.loc[row['Start']:row['End'], vars_mask] = np.nan 
- 
-    
-    # Save after replacing nan values with the flag value -9999:
-    data1.fillna(-9999, inplace=True)    
-    fname_prep = 'WISPER_' + date + '_basic-prep.ict'
-    data1.to_csv(path_wisper_prep_dir + fname_prep, index=False)
-    """
 
+               
+        
+        
+        ## Assign NAN to bad data intervals recorded in the .txt files:
+        ## -----------------------------
+        self.applyna_from_txtfiles(preprodata)
+        
+        
+        ## Assign attribute and optional save:
+        ## ----------------------------------
+        self.preprodata = preprodata
+        if save_output:
+            self.flag_na_switch(preprodata, flag_9999=True)
+            self.preprodata.to_csv(self.writeloc, index=False)
+            
 
 def dataprep_17_18(date):    
     """
@@ -564,3 +537,20 @@ if __name__=='__main__':
           "=============================")
 ##_____________________________________________________________________________
 """   
+#dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
+#                  '20160912','20160914','20160918','20160920','20160924',
+#                  '20160925']
+
+#for date in dates2016_good:
+#    p = Preprocessor(date)
+#    p.preprocess_2016file()
+#    p.test_plots_2016()
+    
+    
+    
+    
+    
+    
+    
+    
+    
