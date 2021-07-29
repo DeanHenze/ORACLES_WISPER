@@ -104,8 +104,7 @@ class Preprocessor(object):
         print("Preprocessing data for ORACLES flight date %s" % self.date)
 
         preprodata = self.rawdata.copy()
-        self.flag_na_switch(preprodata, nan=True)
-        
+        self.flag_na_switch(preprodata, flag=-9999.0, flag2nan=True)
 
         ## Keep only a subset of the vars:
         ## -------------------------------
@@ -150,7 +149,7 @@ class Preprocessor(object):
         ## ----------------------------------
         self.preprodata = preprodata
         if save_output:
-            self.flag_na_switch(preprodata, flag_9999=True)
+            self.flag_na_switch(preprodata, flag=-9999.0, nan2flag=True)
             self.preprodata.to_csv(self.writeloc, index=False)
         
     
@@ -254,17 +253,18 @@ class Preprocessor(object):
                 apply_nan(t_badintvls, varkeys)
         
 
-    def flag_na_switch(self, data, flag_9999=False, nan=False):
+    def flag_na_switch(self, data, flag=None, flag2nan=False, nan2flag=False):
         """
-        Fill NAN's in data with the missing value flag "-9999" or vise versa.
+        Switch from a flag value to a NAN or vise versa for "data". Set "flag" 
+        as the flag value. Set one of "nan2flag" or "flag2nan" to True.
         """
 
-        if flag_9999: 
-            data.replace(-9999.0, np.nan, inplace=True)
-        if nan: 
-            data.fillna(-9999, inplace=True)    
-            data.replace(np.inf,-9999, inplace=True)
-            data.replace(-np.inf,-9999, inplace=True)
+        if flag2nan: 
+            data.replace(flag, np.nan, inplace=True)
+        if nan2flag: 
+            data.fillna(flag, inplace=True)    
+            data.replace(np.inf,flag, inplace=True)
+            data.replace(-np.inf,flag, inplace=True)
             
             
     def test_plots_2016(self):
@@ -308,9 +308,8 @@ class Preprocessor(object):
                     'cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm',]
         preprodata = preprodata[varskeep]
 
-        self.flag_na_switch(preprodata, nan=True)
-        cvivars = ['cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm']
-        preprodata.loc[:,cvivars].replace(-99.0, np.nan, inplace=True)
+        self.flag_na_switch(preprodata, flag=-9999.0, flag2nan=True)        
+        self.flag_na_switch(preprodata, flag=-99.0, flag2nan=True)        
         
 
         ## In a new dataframe, restructure pic0 data so that SDI and CVI inlet 
