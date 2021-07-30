@@ -92,12 +92,22 @@ class Preprocessor(object):
             
         self.date = date
         self.writeloc = writeloc
+    
         
+    def preprocess_file(self, save=False):
+        if self.date == '2016': self.preprocess_2016file(save=save)
+        if self.date in ['2017','2018']: self.preprocess_20172018file(save=save)
         
-    def preprocess_2016file(self, save_output=False):
+    
+    def test_plots(self):
+        if self.date == '2016': self.test_plots_2016()
+        if self.date in ['2017','2018']: self.test_plots_20172018()
+        
+ 
+    def preprocess_2016file(self, save=False):
         """
         Full preprocessing of a 2016 file, as outlined in this script header. 
-        Processed data is added as new attribute "preprodata". If "save_output" 
+        Processed data is added as new attribute "preprodata". If "save" 
         is set to True, the preprocessed data is saved to path "writeloc".
         """
         
@@ -106,9 +116,9 @@ class Preprocessor(object):
         preprodata = self.rawdata.copy()
         self.flag_na_switch(preprodata, flag=-9999.0, flag2nan=True)
 
+
         ## Keep only a subset of the vars:
         ## -------------------------------
-            
         preprodata.drop([' pressure_cavity',' temp_cavity',' temp_das'],
                         axis=1, inplace=True)
             # Rename some vars to be consistent with the other two years:
@@ -119,7 +129,6 @@ class Preprocessor(object):
 
         ## Get data into 1 Hz frequency:
         ## -----------------------------
-            
         # a) group/average timestamps within the same second:
         preprodata.loc[:,'Start_UTC'] = preprodata['Start_UTC'].round(0)    
         preprodata = preprodata.groupby(by='Start_UTC', as_index=False).mean()
@@ -148,10 +157,137 @@ class Preprocessor(object):
         ## Assign attribute and optional save:
         ## ----------------------------------
         self.preprodata = preprodata
-        if save_output:
+        if save:
             self.flag_na_switch(preprodata, flag=-9999.0, nan2flag=True)
             self.preprodata.to_csv(self.writeloc, index=False)
         
+
+    def preprocess_20172018file(self, save=False):
+        """
+        Full preprocessing of a 2017 or 2018 file, as outlined in this script 
+        header. Processed data is added as new attribute "preprodata". If 
+        "save" is set to True, the preprocessed data is saved to path 
+        "writeloc".
+        """
+        
+        print("Preprocessing data for ORACLES flight date %s" % self.date)
+        
+        preprodata = self.rawdata.copy()
+
+
+        ## Keep only a subset of the vars:
+        ## -------------------------------
+        varskeep = ['timestamp','pic0_qh2o','pic0_deld','pic0_delo',
+                    'pic1_qh2o','pic1_deld','pic1_delo','state_valve',
+                    'cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm',]
+        preprodata = preprodata[varskeep]
+
+        self.flag_na_switch(preprodata, flag=-9999.0, flag2nan=True)        
+        self.flag_na_switch(preprodata, flag=-99.0, flag2nan=True)        
+        
+
+        ## restructure pic0 data so that SDI and CVI inlet 
+        ## measurements are separate columns:
+        ## -------------------------------
+            # split original dataframe Pic1 variables:
+        pic1_keys_raw = ['pic0_qh2o','pic0_deld','pic0_delo']
+        pic1_SDI = preprodata.loc[preprodata['state_valve']==0, pic1_keys_raw].copy()  
+        pic1_CVI = preprodata.loc[preprodata['state_valve']==1, pic1_keys_raw].copy()
+            # Rename columns:
+        pic1_keys_tot = ['h2o_tot1','dD_tot1','d18O_tot1']
+        pic1_SDI.rename(columns = dict(zip(pic1_keys_raw, pic1_keys_tot)), 
+                        inplace=True)
+        pic1_keys_cld = ['h2o_cld','dD_cld','d18O_cld']
+        pic1_CVI.rename(columns = dict(zip(pic1_keys_raw, pic1_keys_cld)), 
+                        inplace=True)
+            # Recombine to get NANs where appropriate and add as new columns:
+        preprodata = preprodata.join(
+                                     pd.merge(pic1_SDI, pic1_CVI, how='outer', 
+                                              left_index=True, right_index=True
+                                              ),
+                                     how='left'
+                                     )
+
+    
+        ## Convert the raw data timestamps to seconds since midnight UTC:
+        ## -------------------------------
+        start_utc = np.array([])    
+        for i in preprodata['timestamp']:
+            clock = i[len(i)-8:len(i)]
+            time_secs = int(clock[0:2])*3600 + int(clock[3:5])*60 + int(clock[6:8])
+            start_utc = np.append(start_utc,time_secs)
+        preprodata['Start_UTC'] = start_utc
+        preprodata.drop(columns='timestamp', inplace=True)
+
+
+        ## Compute CVI inlet and excess flows:
+        ## -------------------------------
+            # excess flow, slpm:
+        f_xs = self.rawdata['f_dry_slpm']  \
+               - self.rawdata['state_valve']*(350/1000)  \
+               - self.rawdata['f_user_slpm'] - self.rawdata['f_byp_slpm'] 
+        preprodata['cvi_xsFlow'] = f_xs.round(decimals=2)   
+    
+            # inlet flow, slmp:
+        f_CVI_inlet = self.rawdata['state_valve']*(350/1000)  \
+                      + self.rawdata['f_user_slpm']  \
+                      + self.rawdata['f_byp_slpm']
+        preprodata['cvi_inFlow'] = f_CVI_inlet.round(decimals=2)
+        
+        
+        ## Rename some of the columns:
+        ## -------------------------------
+        keys_old = ['pic1_qh2o','pic1_deld','pic1_delo',
+                    'cvi_enhancement','f_user_slpm','state_valve']
+        keys_new = ['h2o_tot2','dD_tot2','d18O_tot2','cvi_enhance',
+                    'cvi_userFlow','wisper_valve_state']
+        preprodata.rename(columns=dict(zip(keys_old, keys_new)), inplace=True)      
+
+
+        ## Locate bad data and assign NAN:
+        ## -----------------------------
+            # Any rows where Pic1 SDI measurements are all 0 (i.e. for the few  
+            # cases where Mako was shut off during flight):
+        pic1_off = ( (preprodata['h2o_tot1']==0) & (preprodata['dD_tot1']==0) 
+                     & (preprodata['d18O_tot1']==0) )
+        preprodata.loc[pic1_off, ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan
+
+            # All CVI variables and measurements on the CVI for the 10/10/2018 
+            # flight (the CVI was not operated correctly on that day):
+        if self.date=='20181010':
+            preprodata.loc[:, ['h2o_cld','dD_cld','d18O_cld','cvi_lwc', 
+                               'cvi_enhance', 'cvi_dcut50','cvi_inFlow', 
+                               'cvi_xsFlow', 'cvi_userFlow']
+                           ] = np.nan
+        
+            # CVI measurements where q<500ppmv (with the enhancement factor 
+            # of ~30, 500ppmv corresponds to a very low amount of liquid):
+        preprodata.loc[preprodata.h2o_cld<500, ['h2o_cld','dD_cld','d18O_cld']
+                       ] = np.nan
+
+            # Pic2 measurements where pressure deviations from 
+            # 35 torr are greater than 0.2 torr (applicable mostly to 2018):
+        preprodata.loc[ abs(self.rawdata['pic1_pcav']-35)>0.2, 
+                       ['h2o_tot2', 'dD_tot2', 'd18O_tot2'] ] = np.nan
+ 
+            # Some weird Pic1 behavior (mostly in 2017 due to the bad 
+            # thermistor attachment), leading to some clearly outlying values:
+        preprodata.loc[preprodata['dD_tot1']>100, 
+                       ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan   
+        preprodata.loc[preprodata['h2o_tot1']<0, 
+                       ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan
+        
+            # Intervals of bad data recorded in the .txt files:
+        self.applyna_from_txtfiles(preprodata)
+        
+        
+        ## Assign attribute and optional save:
+        ## ----------------------------------
+        self.preprodata = preprodata
+        if save:
+            self.flag_na_switch(preprodata, flag=-9999.0, nan2flag=True)
+            self.preprodata.to_csv(self.writeloc, index=False)
+    
     
     def timestamp_checker(self, data):
         """
@@ -218,8 +354,10 @@ class Preprocessor(object):
 
         d = self.date
         p_txtfiledir = r"./outlier_time_intervals/%s/" % d[:4]
+        data.set_index('Start_UTC', drop=False, inplace=True)    
 
-        def apply_nan(t_badintvls, varkeys):
+
+        def apply_nan(data, t_badintvls, varkeys):
             """
             Assigns NAN to intervals in "data" (for the columns in 
             "varkeys") contained in "t_badintvls" (pandas df). 
@@ -236,7 +374,7 @@ class Preprocessor(object):
         # For 2016, only one .txt file to load for each flight:  
             path_txt = p_txtfiledir + "Pic2_Outlier_Times_" + d + ".txt"
             t_badintvls = pd.read_csv(path_txt, header=0)
-            apply_nan(t_badintvls, ['h2o_tot2','dD_tot2','d18O_tot2'])
+            apply_nan(data, t_badintvls, ['h2o_tot2','dD_tot2','d18O_tot2'])
         
         
         if d[0:4] in  ['2017','2018']:
@@ -250,7 +388,10 @@ class Preprocessor(object):
                           "Pic2_Outlier_Times_" + d + ".txt"]
             for varkeys, f in zip(varkeys_list, fname_list):
                 t_badintvls = pd.read_csv(p_txtfiledir + f, header=0)
-                apply_nan(t_badintvls, varkeys)
+                apply_nan(data, t_badintvls, varkeys)
+                
+        
+        data.reset_index(drop=True, inplace=True)
         
 
     def flag_na_switch(self, data, flag=None, flag2nan=False, nan2flag=False):
@@ -265,8 +406,8 @@ class Preprocessor(object):
             data.fillna(flag, inplace=True)    
             data.replace(np.inf,flag, inplace=True)
             data.replace(-np.inf,flag, inplace=True)
-            
-            
+    
+    
     def test_plots_2016(self):
         
         rawdata = self.rawdata
@@ -285,79 +426,40 @@ class Preprocessor(object):
         
         ax3.plot(rawdata['Start_UTC'], rawdata[' d18O_permil'], 'k-')
         ax3.plot(preprodata['Start_UTC'], preprodata['d18O_tot2'], 'ro')
-
-
-    def preprocess_20172018file(self, save_output=False):
-        """
-        Full preprocessing of a 2017 or 2018 file, as outlined in this script 
-        header. Processed data is added as new attribute "preprodata". If 
-        "save_output" is set to True, the preprocessed data is saved to path 
-        "writeloc".
-        """
         
-        print("Preprocessing data for ORACLES flight date %s" % self.date)
         
-        preprodata = self.rawdata.copy()
+    def test_plots_20172018(self):
+        
+        rawdata = self.rawdata
+        preprodata = self.preprodata
+        
+        plt.figure()
+        ax1 = plt.subplot(3,1,1)
+        ax2 = plt.subplot(3,1,2)
+        ax3 = plt.subplot(3,1,3)
+        
+        # Use time variable from the preprocessed dataframe as x-axis for 
+        # both raw and preprocessed plotting.
+        ax1.plot(preprodata['Start_UTC'], rawdata['pic0_qh2o'], 'k-')
+        ax1.plot(preprodata['Start_UTC'], preprodata['h2o_tot1'], 'ro')
+        ax1.plot(preprodata['Start_UTC'], preprodata['h2o_cld'], 'bx')
+
+        ax2.plot(preprodata['Start_UTC'], rawdata['pic0_deld'], 'k-')
+        ax2.plot(preprodata['Start_UTC'], preprodata['dD_tot1'], 'ro')
+        ax2.plot(preprodata['Start_UTC'], preprodata['dD_cld'], 'bx')
+        
+        ax3.plot(preprodata['Start_UTC'], rawdata['pic0_delo'], 'k-')
+        ax3.plot(preprodata['Start_UTC'], preprodata['d18O_tot1'], 'ro')
+        ax3.plot(preprodata['Start_UTC'], preprodata['d18O_cld'], 'bx')
 
 
-        ## Keep only a subset of the vars:
-        ## -------------------------------
+
+        
             
-        varskeep = ['timestamp','pic0_qh2o','pic0_deld','pic0_delo',
-                    'pic1_qh2o','pic1_deld','pic1_delo','state_valve',
-                    'cvi_enhancement','cvi_dcut50','cvi_lwc','f_user_slpm',]
-        preprodata = preprodata[varskeep]
-
-        self.flag_na_switch(preprodata, flag=-9999.0, flag2nan=True)        
-        self.flag_na_switch(preprodata, flag=-99.0, flag2nan=True)        
-        
-
-        ## In a new dataframe, restructure pic0 data so that SDI and CVI inlet 
-        ## measurements are separate columns:
-        ## -------------------------------
-
-            # split original dataframe Pic1 variables:
-        pic1_varkeys_raw = ['pic0_qh2o','pic0_deld','pic0_delo']
-        pic1_SDI = data0.loc[data0['state_valve']==0, pic1_varkeys_raw]    
-        pic1_CVI = data0.loc[data0['state_valve']==1, pic1_varkeys_raw]
-            # Rename columns:
-        pic1_varkeys_tot = ['h2o_tot1','dD_tot1','d18O_tot1']
-        pic1_SDI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_tot)), 
-                        inplace=True)
-        pic1_varkeys_cld = ['h2o_cld','dD_cld','d18O_cld']
-        pic1_CVI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_cld)), 
-                        inplace=True)
-            # Recombine to get restructured frame:
-        data1 = pd.merge(pic1_SDI, pic1_CVI, how='outer', left_index=True, 
-                     right_index=True)
         
         
         
-        data1['cvi_enhance'] = data0['cvi_enhancement']
-    data1['cvi_dcut50'] = data0['cvi_dcut50']
-    data1['cvi_lwc'] = data0['cvi_lwc']
-    data1['cvi_userFlow'] = data0['f_user_slpm'] 
-    data1['wisper_valve_state'] = data0['state_valve']
-    
-    
         
-
-
-               
-        
-        
-        ## Assign NAN to bad data intervals recorded in the .txt files:
-        ## -----------------------------
-        self.applyna_from_txtfiles(preprodata)
-        
-        
-        ## Assign attribute and optional save:
-        ## ----------------------------------
-        self.preprodata = preprodata
-        if save_output:
-            self.flag_na_switch(preprodata, flag_9999=True)
-            self.preprodata.to_csv(self.writeloc, index=False)
-            
 
 def dataprep_17_18(date):    
     """
