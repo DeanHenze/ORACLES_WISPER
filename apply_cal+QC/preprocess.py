@@ -34,24 +34,19 @@ The data are masked in two ways. First, there are several automated flagging
 criteria hardcoded in this script. Second, there are .txt files where I 
 have manually looked through the data and recorded intervals of clearly bad 
 data. This script reads the intervals in from those files and masks them.
+
+Example usage:
+    date = '20170815'
+    preprocessor = Preprocessor(date)
+    preprocessor.preprocess_file(save=True)
+    preprocessor.test_plots()
 """
 
-
-# Built in:
-import os
 
 # Third party:
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-
-#path_wisper_raw_dir = r"./WISPER_raw_data/"
-#path_wisper_prep_dir = r"./WISPER_processed_data/"
-#path_outlier_tintvls_dir = r"./outlier_time_intervals/"
-
-
-#if not os.path.isdir(path_wisper_prep_dir): os.mkdir(path_wisper_prep_dir)
 
 
 class Preprocessor(object):
@@ -95,20 +90,27 @@ class Preprocessor(object):
     
         
     def preprocess_file(self, save=False):
+        """
+        Full preprocessing of a file, as outlined in this script header. 
+        Processed data is added as new attribute "preprodata". If "save" 
+        is set to True, the preprocessed data is saved to path "writeloc".
+        """        
         if self.date[:4] == '2016': self.preprocess_2016file(save=save)
         if self.date[:4] in ['2017','2018']: self.preprocess_20172018file(save=save)
         
     
     def test_plots(self):
+        """
+        Plot WISPER quantities before and after preprocessing of a file. 
+        """
         if self.date[:4] == '2016': self.test_plots_2016()
         if self.date[:4] in ['2017','2018']: self.test_plots_20172018()
         
  
     def preprocess_2016file(self, save=False):
         """
-        Full preprocessing of a 2016 file, as outlined in this script header. 
-        Processed data is added as new attribute "preprodata". If "save" 
-        is set to True, the preprocessed data is saved to path "writeloc".
+        Full preprocessing of a 2016 file. If "save" is set to True, the 
+        preprocessed data is saved to path "writeloc".
         """
         
         print("Preprocessing data for ORACLES flight date %s" % self.date)
@@ -164,10 +166,8 @@ class Preprocessor(object):
 
     def preprocess_20172018file(self, save=False):
         """
-        Full preprocessing of a 2017 or 2018 file, as outlined in this script 
-        header. Processed data is added as new attribute "preprodata". If 
-        "save" is set to True, the preprocessed data is saved to path 
-        "writeloc".
+        Full preprocessing of a 2017 or 2018 file. If "save" is set to True, 
+        the preprocessed data is saved to path "writeloc".
         """
         
         print("Preprocessing data for ORACLES flight date %s" % self.date)
@@ -410,6 +410,9 @@ class Preprocessor(object):
     
     
     def test_plots_2016(self):
+        """
+        Plot WISPER quantities before and after preprocessing of a 2016 file. 
+        """
         
         rawdata = self.rawdata
         preprodata = self.preprodata
@@ -430,6 +433,9 @@ class Preprocessor(object):
         
         
     def test_plots_20172018(self):
+        """
+        Plot WISPER quantities before and after preprocessing of a 2017/18 file. 
+        """
         
         raw = self.rawdata
         prepro = self.preprodata
