@@ -46,12 +46,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-path_wisper_raw_dir = r"./WISPER_raw_data/"
-path_wisper_prep_dir = r"./WISPER_processed_data/"
-path_outlier_tintvls_dir = r"./outlier_time_intervals/"
+#path_wisper_raw_dir = r"./WISPER_raw_data/"
+#path_wisper_prep_dir = r"./WISPER_processed_data/"
+#path_outlier_tintvls_dir = r"./outlier_time_intervals/"
 
 
-if not os.path.isdir(path_wisper_prep_dir): os.mkdir(path_wisper_prep_dir)
+#if not os.path.isdir(path_wisper_prep_dir): os.mkdir(path_wisper_prep_dir)
 
 
 class Preprocessor(object):
@@ -95,13 +95,13 @@ class Preprocessor(object):
     
         
     def preprocess_file(self, save=False):
-        if self.date == '2016': self.preprocess_2016file(save=save)
-        if self.date in ['2017','2018']: self.preprocess_20172018file(save=save)
+        if self.date[:4] == '2016': self.preprocess_2016file(save=save)
+        if self.date[:4] in ['2017','2018']: self.preprocess_20172018file(save=save)
         
     
     def test_plots(self):
-        if self.date == '2016': self.test_plots_2016()
-        if self.date in ['2017','2018']: self.test_plots_20172018()
+        if self.date[:4] == '2016': self.test_plots_2016()
+        if self.date[:4] in ['2017','2018']: self.test_plots_20172018()
         
  
     def preprocess_2016file(self, save=False):
@@ -218,6 +218,8 @@ class Preprocessor(object):
             start_utc = np.append(start_utc,time_secs)
         preprodata['Start_UTC'] = start_utc
         preprodata.drop(columns='timestamp', inplace=True)
+        
+        self.timestamp_checker(preprodata)
 
 
         ## Compute CVI inlet and excess flows:
@@ -244,7 +246,7 @@ class Preprocessor(object):
         preprodata.rename(columns=dict(zip(keys_old, keys_new)), inplace=True)      
 
 
-        ## Locate bad data and assign NAN:
+        ## Locate bad data and assign NANs:
         ## -----------------------------
             # Any rows where Pic1 SDI measurements are all 0 (i.e. for the few  
             # cases where Mako was shut off during flight):
@@ -272,10 +274,10 @@ class Preprocessor(object):
  
             # Some weird Pic1 behavior (mostly in 2017 due to the bad 
             # thermistor attachment), leading to some clearly outlying values:
-        preprodata.loc[preprodata['dD_tot1']>100, 
-                       ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan   
-        preprodata.loc[preprodata['h2o_tot1']<0, 
-                       ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan
+        preprodata.loc[preprodata['dD_tot1']>100, pic1_keys_tot] = np.nan 
+        preprodata.loc[preprodata['h2o_tot1']<0, pic1_keys_tot] = np.nan
+        preprodata.loc[preprodata['dD_cld']>100, pic1_keys_cld] = np.nan 
+        preprodata.loc[preprodata['h2o_cld']<0, pic1_keys_cld] = np.nan
         
             # Intervals of bad data recorded in the .txt files:
         self.applyna_from_txtfiles(preprodata)
@@ -320,8 +322,7 @@ class Preprocessor(object):
         bool_dt = ( (n_dt_ls1+n_dt_gt1) == 0 ) 
         
         if bool_dt and bool_full and bool_nonan:
-            print("Completed time averaging/interpolation to 1 Hz "
-                  " without needing modifications.")     
+            print("Time stamps are complete and at 1 Hz.")     
         
         else:
         # If any of the tests fail:
@@ -430,9 +431,11 @@ class Preprocessor(object):
         
     def test_plots_20172018(self):
         
-        rawdata = self.rawdata
-        preprodata = self.preprodata
+        raw = self.rawdata
+        prepro = self.preprodata
         
+        ## Time series of water concentration and isotope ratios:
+        ## --------------------------
         plt.figure()
         ax1 = plt.subplot(3,1,1)
         ax2 = plt.subplot(3,1,2)
@@ -440,17 +443,59 @@ class Preprocessor(object):
         
         # Use time variable from the preprocessed dataframe as x-axis for 
         # both raw and preprocessed plotting.
-        ax1.plot(preprodata['Start_UTC'], rawdata['pic0_qh2o'], 'k-')
-        ax1.plot(preprodata['Start_UTC'], preprodata['h2o_tot1'], 'ro')
-        ax1.plot(preprodata['Start_UTC'], preprodata['h2o_cld'], 'bx')
+        ax1.plot(prepro['Start_UTC'], raw['pic0_qh2o'], 'k-', label='raw')
+        ax1.plot(prepro['Start_UTC'], prepro['h2o_tot1'], 'ro', label='CVI')
+        ax1.plot(prepro['Start_UTC'], prepro['h2o_cld'], 'bx', label='SDI')
 
-        ax2.plot(preprodata['Start_UTC'], rawdata['pic0_deld'], 'k-')
-        ax2.plot(preprodata['Start_UTC'], preprodata['dD_tot1'], 'ro')
-        ax2.plot(preprodata['Start_UTC'], preprodata['dD_cld'], 'bx')
+        ax2.plot(prepro['Start_UTC'], raw['pic0_deld'], 'k-', label='raw')
+        ax2.plot(prepro['Start_UTC'], prepro['dD_tot1'], 'ro', label='CVI')
+        ax2.plot(prepro['Start_UTC'], prepro['dD_cld'], 'bx', label='SDI')
         
-        ax3.plot(preprodata['Start_UTC'], rawdata['pic0_delo'], 'k-')
-        ax3.plot(preprodata['Start_UTC'], preprodata['d18O_tot1'], 'ro')
-        ax3.plot(preprodata['Start_UTC'], preprodata['d18O_cld'], 'bx')
+        ax3.plot(prepro['Start_UTC'], raw['pic0_delo'], 'k-', label='raw')
+        ax3.plot(prepro['Start_UTC'], prepro['d18O_tot1'], 'ro', label='CVI')
+        ax3.plot(prepro['Start_UTC'], prepro['d18O_cld'], 'bx', label='SDI')
+
+        ax3.set_xlabel('Time (secs UTC midnight)', fontsize=14)
+        ax1.set_ylabel('H2O, Pic1 (ppmv)', fontsize=14)
+        ax2.set_ylabel('dD, Pic1 (permil)', fontsize=14)
+        ax3.set_ylabel('d18O, Pic1 (permil)', fontsize=14)
+        
+        for ax in [ax1,ax2,ax3]: ax.legend(fontsize=12)
+    
+
+        ## Time series of CVI system flows:
+        ## --------------------------
+        plt.figure()
+        ax4 = plt.subplot(3,1,1)
+        ax4.plot(prepro['Start_UTC'], prepro['cvi_enhance'], 
+                 label='cvi enhancement factor')
+        ax5 = ax4.twinx()
+        ax5.plot(prepro['Start_UTC'], prepro['wisper_valve_state'], 
+                 'k--', label='valve state')
+        ax4.legend(loc='upper right', fontsize=12); ax5.legend(loc='upper left')
+        ax4.set_ylim(-5, 50)
+        ax4.set_title('CVI system', fontsize=14)
+        
+        
+        ax6 = plt.subplot(3,1,2)
+        ax6.plot(prepro['Start_UTC'], prepro['cvi_inFlow'], label='cvi inlet')
+        ax6.plot(prepro['Start_UTC'], prepro['cvi_userFlow'],label='user')
+        ax7 = ax6.twinx()
+        ax7.plot(prepro['Start_UTC'], prepro['wisper_valve_state'], 
+                 'k--', label='valve state')
+        ax6.legend(loc='upper right'); ax7.legend(loc='upper left')
+        
+        
+        ax8 = plt.subplot(3,1,3)
+        ax8.plot(prepro['Start_UTC'], prepro['cvi_xsFlow'], 
+                 label='cvi excess')        
+        ax9 = ax8.twinx()
+        ax9.plot(prepro['Start_UTC'], prepro['wisper_valve_state'], 
+                 'k--', label='valve state')
+        ax8.set_ylim(-1, 1)
+        ax8.set_xlabel('Time (secs UTC midnight)', fontsize=14)
+        ax8.legend(loc='upper right'); ax9.legend(loc='upper left')        
+        
 
 
 
@@ -461,152 +506,7 @@ class Preprocessor(object):
         
         
 
-def dataprep_17_18(date):    
-    """
-    Process a raw data file for 2017 or 2018.
-        
-    date (str) 'yyyymmdd'. flight date.
-    """   
-    
-    print('Preparing data for %s' % date)
 
-    global path_wisper_raw_dir, path_wisper_prep_dir
-    global path_outlier_tintvls_dir
-
-
-    # Load WISPER data and change missing value flags to np.nan:
-    fname_raw = 'WISPER_'+date+'_rawField.dat'
-    data0 = pd.read_csv(path_wisper_raw_dir + fname_raw)
-    data0.replace(-9999.0, np.nan, inplace=True)
-    data0.replace(-99.0, np.nan, inplace=True)
-                    
-
-    # In a new dataframe, restructure Pic1 data so that SDI and CVI inlet 
-    # measurements are separate columns:
-        # split original dataframe Pic1 variables:
-    pic1_varkeys_raw = ['pic0_qh2o','pic0_deld','pic0_delo']
-    pic1_SDI = data0.loc[data0['state_valve']==0, pic1_varkeys_raw]    
-    pic1_CVI = data0.loc[data0['state_valve']==1, pic1_varkeys_raw]
-        # Rename columns:
-    pic1_varkeys_tot = ['h2o_tot1','dD_tot1','d18O_tot1']
-    pic1_SDI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_tot)), 
-                    inplace=True)
-    pic1_varkeys_cld = ['h2o_cld','dD_cld','d18O_cld']
-    pic1_CVI.rename(columns = dict(zip(pic1_varkeys_raw, pic1_varkeys_cld)), 
-                    inplace=True)
-        # Recombine to get restructured frame:
-    data1 = pd.merge(pic1_SDI, pic1_CVI, how='outer', left_index=True, 
-                 right_index=True)
-        
-
-    # Add additional columns to the new dataframe from above:    
-        # Get seconds since midnight UTC from the raw data timestamps:
-    start_utc = np.array([])    
-    for i in data0['timestamp']:
-        clock = i[len(i)-8:len(i)]
-        time_secs = int(clock[0:2])*3600 + int(clock[3:5])*60 + int(clock[6:8])
-        start_utc = np.append(start_utc,time_secs)
-    data1['Start_UTC'] = start_utc
-        
-        # CVI variables taken directly from raw data:
-    data1['cvi_enhance'] = data0['cvi_enhancement']
-    data1['cvi_dcut50'] = data0['cvi_dcut50']
-    data1['cvi_lwc'] = data0['cvi_lwc']
-    data1['cvi_userFlow'] = data0['f_user_slpm'] 
-    data1['wisper_valve_state'] = data0['state_valve']
-        
-        # CVI excess flow, in slpm:
-    f_xs = data0['f_dry_slpm'] - data0['state_valve']*(350/1000)              \
-        - data0['f_user_slpm'] - data0['f_byp_slpm'] 
-    data1['cvi_xsFlow'] = f_xs.round(decimals=2)   
-
-        # CVI inlet flow, in slmp:
-    f_CVI_inlet = data0['state_valve']*(350/1000) + data0['f_user_slpm']      \
-        + data0['f_byp_slpm']
-    data1['cvi_inFlow'] = f_CVI_inlet.round(decimals=2)
-    
-        # Pic2 measurements:
-    data1['h2o_tot2'] = data0['pic1_qh2o']
-    data1['dD_tot2'] = data0['pic1_deld']
-    data1['d18O_tot2'] = data0['pic1_delo']
-    
-
-    # Mask bad data:
-        # Any rows where Pic1 SDI measurements are all 0 (ie this would be the 
-        # case if Mako were shut off during flight):
-    pic1_off = ( (data1['h2o_tot1']==0) & (data1['dD_tot1']==0) 
-                 & (data1['d18O_tot1']==0) )
-    data1.loc[pic1_off, ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan
-
-        # All CVI variables and measurements on the CVI for the 10/10/2018 flight. 
-        # (the CVI was not operated correctly on that day):
-    if date=='20181010':
-        data1.loc[:, ['h2o_cld','dD_cld','d18O_cld','cvi_lwc', 
-                      'cvi_enhance', 'cvi_dcut50','cvi_inFlow', 
-                      'cvi_xsFlow', 'cvi_userFlow']
-                  ] = np.nan
-
-        # CVI measurements where q<500ppmv (with the enhancement 
-        # factor of ~30, 500ppmv corresponds to a very low amount of liquid):
-    data1.loc[data1.h2o_cld<500, ['h2o_cld','dD_cld','d18O_cld']] = np.nan
-
-        # Pic2 (Spiny) measurements in 2018 where pressure deviations from 
-        # 35 torr are greater than 0.2 torr:
-    if date[0:4]=='2018':
-        data1.loc[ abs(data0['pic1_pcav']-35)>0.2, 
-                  ['h2o_tot2', 'dD_tot2', 'd18O_tot2'] ] = np.nan
- 
-        # Some weird Pic1 behavior (mostly in 2017 due to the bad 
-        # thermistor attachment), leading to some clearly outlying values:
-    data1.loc[data1['dD_tot1']>100, ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan   
-    data1.loc[data1['h2o_tot1']<0, ['h2o_tot1','dD_tot1','d18O_tot1']] = np.nan
-        
-        # Additional time intervals of outlying data identified in the 
-        # separate .txt files:
-    data1.set_index('Start_UTC', drop=False, inplace=True)    
-    
-    
-    def ol_txt_mask(data, path_outliers_txt, varkeys_mask):
-        t_outlier = pd.read_csv(path_outliers_txt, header=0) # Load .txt file.
-        for i,row in t_outlier.iterrows():
-            if row['Start']==0: 
-                # Only mask variables in varkeys_mask:
-                data.loc[:row['End'], varkeys_mask] = np.nan
-            else:
-                data.loc[row['Start']:row['End'], varkeys_mask] = np.nan
-        return data
-        
-    data1 = ol_txt_mask(data1, # Pic1 total water mask from .txt file.
-                        path_outlier_tintvls_dir + 
-                        r'/'+date[0:4]+r'/Pic1_Tot_Outlier_Times_'+date+'.txt', 
-                        ['h2o_tot1','dD_tot1','d18O_tot1'])
-        
-    data1 = ol_txt_mask(data1, # Pic1 cloud water mask from .txt file.
-                        path_outlier_tintvls_dir + 
-                        r'/'+date[0:4]+r'/Pic1_Cld_Outlier_Times_'+date+'.txt', 
-                        ['h2o_cld','dD_cld','d18O_cld','cvi_lwc']) 
-        
-    data1 = ol_txt_mask(data1, # Pic2 total water mask from .txt file.
-                        path_outlier_tintvls_dir + 
-                        r'/'+date[0:4]+r'/Pic2_Outlier_Times_'+date+'.txt', 
-                        ['h2o_tot2','dD_tot2','d18O_tot2'])                 
-
-        
-    # re-order columns:
-    columns = ['Start_UTC','wisper_valve_state','h2o_tot1','h2o_tot2','h2o_cld',
-               'dD_tot1','dD_tot2','dD_cld','d18O_tot1','d18O_tot2',
-               'd18O_cld','cvi_lwc', 'cvi_enhance', 'cvi_dcut50',
-               'cvi_inFlow', 'cvi_xsFlow', 'cvi_userFlow']
-    data1 = data1[columns]
-            
-        
-    # Save after replacing nan, inf, and -inf values with the flag value -9999:
-    data1.fillna(-9999, inplace=True)    
-    data1 = data1.replace(np.inf,-9999)
-    data1 = data1.replace(-np.inf,-9999)
-
-    fname_prep = 'WISPER_' + date + '_basic-prep.ict'
-    data1.to_csv(path_wisper_prep_dir + fname_prep, index=False)
 
 
 """
