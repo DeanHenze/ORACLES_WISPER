@@ -44,9 +44,9 @@ Example usage:
 
 
 # Third party:
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np # 1.19.2
+import pandas as pd # 1.1.3
+import matplotlib.pyplot as plt # 3.3.2
 
 
 class Preprocessor(object):
