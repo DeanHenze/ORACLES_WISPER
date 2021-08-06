@@ -86,7 +86,7 @@ def time_shift(data, P_var, t_var, shift_vars, params):
     
     # Apply pressure dependent correction and round to the nearest integer:
         # First remove any unphyically high pressures:
-    data_shift.loc[data_shift[P_var]>1100]=np.nan
+    data_shift.loc[data_shift[P_var]>1100, P_var]=np.nan
         # Apply shift, to nearest second:
     data_shift.loc[:,t_var] =                                                 \
         data_shift[t_var] + params[0]*data_shift[P_var] + params[1]
@@ -103,7 +103,7 @@ def time_shift(data, P_var, t_var, shift_vars, params):
     
     if len(np.where(dt>1)[0])!=0:
         # If there are gaps > 1s...
-        print('time gap greater than 1s, fixing...')
+        print('\t time gap greater than 1 s after the shift, fixing...')
         # Create reference time var with no gaps:
         t0 = data_shift[t_var].iloc[0]; tf = data_shift[t_var].iloc[-1]
         t_ref = pd.DataFrame({'t_ref':np.arange(t0,tf+1,1)})
@@ -113,9 +113,9 @@ def time_shift(data, P_var, t_var, shift_vars, params):
         # Interpolate and verify everything went well:
         data_shift.interpolate(method='linear', axis=0, limit=3, inplace=True)
         if np.sum( pd.notnull(data_shift[t_var]) ) != tf-t0+1:
-            print('Warning: Unsuccessful averaging/interpolation.')
+            print('\t WARNING: Unsuccessful averaging/interpolation.')
         else:
-            print('Fixed!')
+            print('\t Fixed!')
     
     
     # Merge shifted data into original df, replacing the original vars:
@@ -146,6 +146,8 @@ def wisper_tsync(df_wisper, date):
     date: str.
         Flight date 'yyyymmdd'.
     """
+    print("Time synchronization for ORACLES flight date %s" % date)
+    
     # Specify shift slope(s) and offset(s) depending on the year.
     #   m2C=slope for Pic2 shifting to COMA, m1C=slope for Pic1&2 shifting to COMA
     #   m21=slope for Pic2 shifting to Pic1,
@@ -173,8 +175,8 @@ def wisper_tsync(df_wisper, date):
             m21=0.0057; b21=-187.11 - 10
     
     
-    # Load WISPER and pressure data as a pandas df:
-    data = data_with_pressure(date)    
+    # Combine WISPER with pressure data:
+    data = data_with_pressure(df_wisper, date)    
     
     
     # Apply shifts:    
@@ -203,9 +205,8 @@ def wisper_tsync(df_wisper, date):
         data.loc[:,'cvi_lwc'] = 0.622*data['h2o_cld']/1000/data['cvi_enhance']
   
     
-    # Return data after some df flagging and cleanup:
+    # Return data after dropping pressure column:
     data.drop(['Static_Pressure'], axis=1, inplace=True)
-    data.fillna(-9999.0, inplace=True)    
     return data
     
 
@@ -219,9 +220,16 @@ def test_plot(df1, df2, date):
     date: str.
         Flight date 'yyyymmdd'.
     """
-    # Pic2 shifted to Pic1:
-    if date[:4] in ['2017','2018']:
-        
+    # 0.2 Hz versions of the timeseries as separate df's:
+    df1_0p2Hz = df1.copy(); df2_0p2Hz = df2.copy()
+    df1_0p2Hz.replace(-9999.0, np.nan, inplace=True)    
+    df2_0p2Hz.replace(-9999.0, np.nan, inplace=True)    
+    df1_0p2Hz = df1_0p2Hz.groupby(np.round(df1_0p2Hz['Start_UTC']/5)*5).mean()
+    df2_0p2Hz = df2_0p2Hz.groupby(np.round(df2_0p2Hz['Start_UTC']/5)*5).mean()
+
+
+    # ORACLES 2016 only: Pic2 before and after shift:
+    if date[:4] == '2016':
         plt.figure()
         ax1 = plt.subplot(3,1,1)
         ax2 = plt.subplot(3,1,2)
@@ -229,66 +237,41 @@ def test_plot(df1, df2, date):
         
         varsprefix = ['h2o','dD','d18O']
         for ax, v in zip([ax1,ax2,ax3], varsprefix):
-            ax.plot(df1['Start_UTC'], df1[v+'_tot1'], 'k-', label='Pic1')
-            ax.plot(df1['Start_UTC'], df1[v+'_tot2'], 'rx', label='Pic2, before')
-            ax.plot(df2['Start_UTC'], df2[v+'_tot2'], 'bx', label='Pic2, after')
-            ax.legend(fontize=12)
+            ax.plot(df1_0p2Hz['Start_UTC'], df1_0p2Hz[v+'_tot2'], 
+                    'k-', label='Pic2, before')
+            ax.plot(df2_0p2Hz['Start_UTC'], df2_0p2Hz[v+'_tot2'], 
+                    'k--', label='Pic2, after')
+            ax.legend(fontsize=12)
             
         ax1.set_ylabel("H2O (ppmv)", fontsize=12)
         ax2.set_ylabel("dD (permil)", fontsize=12)
         ax3.set_ylabel("d18O (permil)", fontsize=12)
-        ax1.set_title("Pic2 shifted relative to Pic1", fontsize=12)
-        
+        ax1.set_title("Pic2 shifted relative to Pic1", fontsize=12)        
+    
 
     # Pic1 and Pic2 total water quantities before and after the total shifts:
-    plt.figure()
-    ax1 = plt.subplot(3,1,1)
-    ax2 = plt.subplot(3,1,2)
-    ax3 = plt.subplot(3,1,3)
-    
-    varsprefix = ['h2o','dD','d18O']
-    for ax, v in zip([ax1,ax2,ax3], varsprefix):
-        ax.plot(df1['Start_UTC'], df1[v+'_tot1'], 'r-', label='Pic1, before')
-        ax.plot(df1['Start_UTC'], df1[v+'_tot2'], 'b-', label='Pic2, before')
-        ax.plot(df2['Start_UTC'], df2[v+'_tot1'], 'rx', label='Pic1, after')
-        ax.plot(df2['Start_UTC'], df2[v+'_tot2'], 'bx', label='Pic2, after')
-        ax.legend(fontize=12)
+    if date[:4] in ['2017','2018']:
+        plt.figure()
+        ax1 = plt.subplot(3,1,1)
+        ax2 = plt.subplot(3,1,2)
+        ax3 = plt.subplot(3,1,3)
         
-    ax1.set_ylabel("H2O (ppmv)", fontsize=12)
-    ax2.set_ylabel("dD (permil)", fontsize=12)
-    ax3.set_ylabel("d18O (permil)", fontsize=12)
-    ax1.set_title("Pic1 and Pic2 after total shifts", fontsize=12)
+        varsprefix = ['h2o','dD','d18O']
+        for ax, v in zip([ax1,ax2,ax3], varsprefix):
+            ax.plot(df1_0p2Hz['Start_UTC'], df1_0p2Hz[v+'_tot1'], 
+                    'r-', label='Pic1, before')
+            ax.plot(df1_0p2Hz['Start_UTC'], df1_0p2Hz[v+'_tot2'], 
+                    'b-', label='Pic2, before')
+            ax.plot(df2_0p2Hz['Start_UTC'], df2_0p2Hz[v+'_tot1'], 
+                    'r--', label='Pic1, after')
+            ax.plot(df2_0p2Hz['Start_UTC'], df2_0p2Hz[v+'_tot2'], 
+                    'b--', label='Pic2, after')
+            ax.legend(fontsize=12)
+            
+        ax1.set_ylabel("H2O (ppmv)", fontsize=12)
+        ax2.set_ylabel("dD (permil)", fontsize=12)
+        ax3.set_ylabel("d18O (permil)", fontsize=12)
+        ax1.set_title("Pic1 and Pic2 after total shifts", fontsize=12)
     
     
-    
-
-
-"""
-if __name__=='__main__':
-##_____________________________________________________________________________
-## ORACLES research flight dates for days where WISPER took good data:
-    dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
-                      '20160912','20160914','20160918','20160920','20160924',
-                      '20160925']
-    dates2017_good = ['20170812','20170813','20170815','20170817','20170818',
-                      '20170821','20170824','20170826','20170828','20170830',
-                      '20170831','20170902']
-    dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
-                      '20181012','20181015','20181017','20181019','20181021',
-                      '20181023']
-
-
-## Run prep functions for all good days:
-    print("=============================\n"
-          "Starting time synchronization\n"
-          "=============================")
-        
-    wisper_tsync(dates2016_good)
-    wisper_tsync(dates2017_good)
-    wisper_tsync(dates2018_good)
-    
-    print("=============================\n"
-          "Time synchronization complete\n"
-          "=============================")
-##_____________________________________________________________________________
-"""
+    del df1_0p2Hz, df2_0p2Hz 

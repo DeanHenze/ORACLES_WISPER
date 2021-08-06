@@ -322,11 +322,11 @@ class Preprocessor(object):
         bool_dt = ( (n_dt_ls1+n_dt_gt1) == 0 ) 
         
         if bool_dt and bool_full and bool_nonan:
-            print("Time stamps are complete and at 1 Hz.")     
+            print("\t Time stamps are complete and at 1 Hz.")     
         
         else:
         # If any of the tests fail:
-            print('Modification to time variable needed.')
+            print('\t Modification to time variable needed.')
             print('\t tf-t0+1 = '+str(tf-t0+1))
             print('\t Number of rows in 1s-averaged data after NAN filling = '
                   +str(n_full))
