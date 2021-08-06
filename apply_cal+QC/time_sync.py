@@ -7,8 +7,8 @@ Created on Fri Mar 12 13:00:10 2021
 Collection of functions to apply pressure-dependent time shifts to WISPER 
 data and create verification plots.
 
-Functions
----------
+List of Functions
+-----------------
 wisper_tsync: 
     Function to call to apply time shifts to a single WISPER file.
 
