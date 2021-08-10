@@ -30,6 +30,7 @@ dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
                   '20181023']
 
 
+# Calibration of a single file:
 def calibrate_file(date):
     """
     Calibrate a WISPER file for the P3 flight on the passed date ('yyyymmdd').
