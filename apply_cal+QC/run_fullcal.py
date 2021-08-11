@@ -18,7 +18,7 @@ path_rawdir = r"./WISPER_raw_data/"
 path_caldir = r"./WISPER_calibrated_data/"
 
 
-# ORACLES research flight dates for days where WISPER took good data:
+# ORACLES research flight dates where WISPER took good data:
 dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
                   '20160912','20160914','20160918','20160920','20160924',
                   '20160925']
@@ -37,8 +37,10 @@ def calibrate_file(date):
     """
     
     # Preprocessing procedure:
-    pre = preprocess.Preprocessor(date)
+    pre = preprocess.Preprocessor(date, rawdatadir=path_rawdir, 
+                                  outliersdir=r'./outlier_time_intervals/')
     pre.preprocess_file()
+    pre.test_plots()
     
     # Time synchronization:
     data_syncd = time_sync.wisper_tsync(pre.preprodata, date)
@@ -49,9 +51,9 @@ def calibrate_file(date):
     data_syncd.to_csv(path_caldir + fname, index=False)
     
 
-for date in dates2016_good: calibrate_file(date)
-for date in dates2017_good: calibrate_file(date)
-for date in dates2018_good: calibrate_file(date)
+#for date in dates2016_good: calibrate_file(date)
+for date in dates2017_good[:4]: calibrate_file(date)
+#for date in dates2018_good: calibrate_file(date)
 
 
 

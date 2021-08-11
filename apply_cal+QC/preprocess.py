@@ -58,34 +58,40 @@ class Preprocessor(object):
     date: str.
         ORACLES flight date "yyyymmdd" for the datafile.
         
-    rawdata: optional, pandas.core.frame.DataFrame.
-        The raw dataset for the appropriate flight date. If passed, rawdata is 
-        assigned directly. Otherwise, the raw datafile will be loaded into a 
-        pandas df and assigned during __init__. 
+    rawdata: pandas.core.frame.DataFrame, default=None.
+        The raw dataset for the appropriate flight date. Only one of 'rawdata' 
+        or 'rawdatadir' should be specified. 
         
-    writeloc: str
+    rawdatadir: str, default=None.
+        Path (relative or abs) to the directory containing the raw data file. 
+        In this case, the datafile will be loaded and assigned to the attribute 
+        'rawdata'. Only one of 'rawdata' or 'rawdatadir' should be specified. 
+
+    outliersdir: str.
+        Path (relative or absolute) to the outlier time intervals .txt. files.
+        
+    writeloc: str.
         Path (relative or absolute) to save the preprocessed data to.
     """
-    
-    
-    def __init__(self, date, rawdata=None, writeloc=""):
+    def __init__(self, date, rawdata=None, rawdatadir=None, 
+                 outliersdir="", writeloc=""):
         
         # If a pandas df was already passed:
         if type(rawdata)==pd.core.frame.DataFrame:
             self.rawdata = rawdata
             
-        # If no df passed, load the datafile as pandas df using 'date':
-        elif rawdata is None:
+        # If no df passed, load the datafile from 'rawdatadir':
+        elif rawdatadir is not None:
             if date[:4]=='2016': 
                 header=37
                 fname_raw = 'WISPER_'+date+'_rawField.ict'
             if date[:4] in ['2017','2018']: 
                 header=0
                 fname_raw = 'WISPER_'+date+'_rawField.dat'
-            self.rawdata = pd.read_csv(r"./WISPER_raw_data/" + fname_raw, 
-                                       header=header)            
+            self.rawdata = pd.read_csv(rawdatadir + fname_raw, header=header)            
             
         self.date = date
+        self.outliersdir = outliersdir
         self.writeloc = writeloc
     
         
@@ -354,7 +360,7 @@ class Preprocessor(object):
         """
 
         d = self.date
-        p_txtfiledir = r"./outlier_time_intervals/%s/" % d[:4]
+        outliersdir = self.outliersdir + d[:4] + r'/' # Append year subfolder.
         data.set_index('Start_UTC', drop=False, inplace=True)    
 
 
@@ -373,7 +379,7 @@ class Preprocessor(object):
 
         if d[0:4] == '2016':
         # For 2016, only one .txt file to load for each flight:  
-            path_txt = p_txtfiledir + "Pic2_Outlier_Times_" + d + ".txt"
+            path_txt = outliersdir + "Pic2_Outlier_Times_" + d + ".txt"
             t_badintvls = pd.read_csv(path_txt, header=0)
             apply_nan(data, t_badintvls, ['h2o_tot2','dD_tot2','d18O_tot2'])
         
@@ -388,7 +394,7 @@ class Preprocessor(object):
                           "Pic1_Cld_Outlier_Times_" + d + ".txt",
                           "Pic2_Outlier_Times_" + d + ".txt"]
             for varkeys, f in zip(varkeys_list, fname_list):
-                t_badintvls = pd.read_csv(p_txtfiledir + f, header=0)
+                t_badintvls = pd.read_csv(outliersdir + f, header=0)
                 apply_nan(data, t_badintvls, varkeys)
                 
         
@@ -503,47 +509,7 @@ class Preprocessor(object):
         ax8.legend(loc='upper right'); ax9.legend(loc='upper left')        
         
 
-
-
-        
-            
-        
-        
-        
-        
-
-
-
-
-"""
-if __name__=='__main__':
-##_____________________________________________________________________________
-## ORACLES research flight dates for days where WISPER took good data:
-    dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
-                      '20160912','20160914','20160918','20160920','20160924',
-                      '20160925']
-    dates2017_good = ['20170812','20170813','20170815','20170817','20170818',
-                      '20170821','20170824','20170826','20170828','20170830',
-                      '20170831','20170902']
-    dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
-                      '20181012','20181015','20181017','20181019','20181021',
-                      '20181023']
-
-
-## Run prep functions for all good days:
-    print("=============================\n"
-          "Starting raw data preparation\n"
-          "=============================")
-        
-    for date in dates2016_good: dataprep_16(date)
-    for date in dates2017_good: dataprep_17_18(date)
-    for date in dates2018_good: dataprep_17_18(date)
-    
-    print("=============================\n"
-          "Raw data preparation complete\n"
-          "=============================")
-##_____________________________________________________________________________
-"""   
+## Some tester code:
 #dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
 #                  '20160912','20160914','20160918','20160920','20160924',
 #                  '20160925']
@@ -552,12 +518,3 @@ if __name__=='__main__':
 #    p = Preprocessor(date)
 #    p.preprocess_2016file()
 #    p.test_plots_2016()
-    
-    
-    
-    
-    
-    
-    
-    
-    
