@@ -43,10 +43,20 @@ Example usage:
 """
 
 
+# Built in:
+import inspect
+import os
+
 # Third party:
 import numpy as np # 1.19.2
 import pandas as pd # 1.1.3
 import matplotlib.pyplot as plt # 3.3.2
+
+
+# Get the path of the directory containing this script (used in combination 
+# with relative paths to locate datafiles):
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+scriptpath = os.path.dirname(os.path.abspath(filename))
 
 
 class Preprocessor(object):
@@ -59,39 +69,30 @@ class Preprocessor(object):
         ORACLES flight date "yyyymmdd" for the datafile.
         
     rawdata: pandas.core.frame.DataFrame, default=None.
-        The raw dataset for the appropriate flight date. Only one of 'rawdata' 
-        or 'rawdatadir' should be specified. 
-        
-    rawdatadir: str, default=None.
-        Path (relative or abs) to the directory containing the raw data file. 
-        In this case, the datafile will be loaded and assigned to the attribute 
-        'rawdata'. Only one of 'rawdata' or 'rawdatadir' should be specified. 
-
-    outliersdir: str.
-        Path (relative or absolute) to the outlier time intervals .txt. files.
-        
+        The raw dataset for the appropriate flight date. If left as None, the 
+        datafile will automatically be loaded and assigned to 'rawdata'.
+            
     writeloc: str.
         Path (relative or absolute) to save the preprocessed data to.
     """
-    def __init__(self, date, rawdata=None, rawdatadir=None, 
-                 outliersdir="", writeloc=""):
+    def __init__(self, date, rawdata=None, writeloc=""):
         
         # If a pandas df was already passed:
         if type(rawdata)==pd.core.frame.DataFrame:
             self.rawdata = rawdata
             
-        # If no df passed, load the datafile from 'rawdatadir':
-        elif rawdatadir is not None:
+        # If no df passed, load the datafile:
+        elif rawdata is None:
             if date[:4]=='2016': 
                 header=37
                 fname_raw = 'WISPER_'+date+'_rawField.ict'
             if date[:4] in ['2017','2018']: 
                 header=0
                 fname_raw = 'WISPER_'+date+'_rawField.dat'
+            rawdatadir = scriptpath + "\\WISPER_raw_data\\"
             self.rawdata = pd.read_csv(rawdatadir + fname_raw, header=header)            
             
         self.date = date
-        self.outliersdir = outliersdir
         self.writeloc = writeloc
     
         
@@ -360,7 +361,8 @@ class Preprocessor(object):
         """
 
         d = self.date
-        outliersdir = self.outliersdir + d[:4] + r'/' # Append year subfolder.
+        bad_intvls_dir = (scriptpath + "\\outlier_time_intervals\\" 
+                          + d[:4] + "\\") # Path to directory of bad data intervals.
         data.set_index('Start_UTC', drop=False, inplace=True)    
 
 
@@ -379,7 +381,7 @@ class Preprocessor(object):
 
         if d[0:4] == '2016':
         # For 2016, only one .txt file to load for each flight:  
-            path_txt = outliersdir + "Pic2_Outlier_Times_" + d + ".txt"
+            path_txt = bad_intvls_dir + "Pic2_Outlier_Times_" + d + ".txt"
             t_badintvls = pd.read_csv(path_txt, header=0)
             apply_nan(data, t_badintvls, ['h2o_tot2','dD_tot2','d18O_tot2'])
         
@@ -394,7 +396,7 @@ class Preprocessor(object):
                           "Pic1_Cld_Outlier_Times_" + d + ".txt",
                           "Pic2_Outlier_Times_" + d + ".txt"]
             for varkeys, f in zip(varkeys_list, fname_list):
-                t_badintvls = pd.read_csv(outliersdir + f, header=0)
+                t_badintvls = pd.read_csv(bad_intvls_dir + f, header=0)
                 apply_nan(data, t_badintvls, varkeys)
                 
         

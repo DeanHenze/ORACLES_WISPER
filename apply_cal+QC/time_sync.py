@@ -19,11 +19,22 @@ data_with_pressure, time_shift:
     Used by 'wisper_tsync'. No need to call separately.
 """
 
+
+# Built in:
+import inspect
+import os
+
 # Third party:
 import numpy as np # 1.19.2
 import pandas as pd # 1.1.3
 import netCDF4 as nc # 1.5.3
 import matplotlib.pyplot as plt # 3.3.2
+
+
+# Get the path of the directory containing this script (used in combination 
+# with relative paths to locate datafiles):
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+scriptpath = os.path.dirname(os.path.abspath(filename))
 
 
 def data_with_pressure(df_wisper, date):
@@ -43,7 +54,7 @@ def data_with_pressure(df_wisper, date):
     df_wisper.replace(-9999.0, np.nan, inplace=True)
 
     # Load P3 merge data as nc dataset (has the pressure data):
-    path_p3merge = r"./P3_merge_data/"
+    path_p3merge = scriptpath + "\\P3_merge_data\\"
     year = date[0:4]
     if year=='2016': revnum = 'R25'
     if year=='2017': revnum = 'R18'
