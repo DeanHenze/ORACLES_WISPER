@@ -16,74 +16,72 @@ Notes:
 
 
 # Built in:
-import os, sys
+import os
 import itertools
 
 # Third party:
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import statsmodels.api as sm
-from openpyxl import load_workbook
+import numpy as np # 1.19.2
+import matplotlib.pyplot as plt # 3.3.2
+import pandas as pd # 1.1.3
+import statsmodels.api as sm # 0.12.0
 
 # My modules:
-import ancillary as anc
-if r'../..' not in sys.path: sys.path.insert(0,r'../..')
-from my_python_modules import math_henze as hmath
+import oversampler
+import wisper_oracles_pic1cal as pic1cal
 
 
-"""
-Load all WISPER (q,dD,d18O) data for either 2017 or 2018 with good data. 
-Return as a pandas df.
-"""
 def get_wisperdata(year):
-
-    path_data_dir = r"../WISPER_data/pic1_cal/"
-
-    if year=='2017':
-        dates_good = ['20170815','20170817','20170818','20170821','20170824',
-                      '20170826','20170828','20170830','20170831','20170902']
-    elif year=='2018':
-        dates_good = ['20180927','20180930','20181003','20181007','20181010',
-                      '20181012','20181015','20181017','20181019','20181021',
-                      '20181023']
-            
-    fnames = ['WISPER_'+d+'_pic1-cal.ict' for d in dates_good]
-    paths_dates = [path_data_dir+f for f in fnames] # Paths to each data file.
+    """
+    Load all WISPER (q,dD,d18O) data for either 2017 or 2018 with good data 
+    and average the data into 8 second blocks before returning. 
+    Return as a pandas df.
     
-## Loop through each date and append data to a single pandas df:
+    year: str, '2017' or '2018'.
+    """
+    # Get paths to all data files for the input year:
+    if year=='2017':
+        dates_good = pic1cal.dates2017_good
+    elif year=='2018':
+        dates_good = pic1cal.dates2018_good
+ 
+    path_data_dir = pic1cal.path_pic1caldir # directory with data files.
+    fnames = ['WISPER_pic1cal_%s.ict' % d for d in dates_good]
+    paths_data = [path_data_dir+f for f in fnames]
+    
+    
+    # Loop through each date and append data to a single pandas df:
     columns = ['h2o_tot1','h2o_tot2','dD_tot1',
                'dD_tot2','d18O_tot1','d18O_tot2'] # Keep these data columns.
     wisper = pd.DataFrame({}, columns=columns) # Append all data here.
-    for p in paths_dates:
+    for p in paths_data:
         data_temp = pd.read_csv(p) # Load.
         data_temp.replace(-9999, np.nan, inplace=True)
-        #data_temp = data_temp.rolling(window=10).mean() # Running mean.
-        #wisper = wisper.append(data_temp[columns], ignore_index=True)
+        # Average data into 8 s blocks before appending:
         data_blocked = data_temp.groupby(lambda x: np.round(x/8)).mean()
         wisper = wisper.append(data_blocked[columns], ignore_index=True)
     
     return wisper.dropna(how='any') # Drop missing values
 
 
-"""
-Fit a line to Pic1 vs Pic2 vapor concentration. Line is constrained to pass
-through the origin. 'df' is the pandas dataframe of wisper measurements.
-"""
 def q_xcal(df):
+    """
+    Fit a line to Pic1 vs Pic2 vapor concentration. Line is constrained to pass
+    through the origin. 'df' is the pandas dataframe of wisper measurements.
+    """
     return sm.OLS(df['h2o_tot1'], df['h2o_tot2'], missing='drop').fit()
     
     
-"""
-Produces powers of predictor vars for a candidate model to use with 
-statsmodels. 
-
-predictvars (pandas dataframe): Contains predictor vars for model.
-pwr_range (dict): keys are a subset of the columns in predictvars. Elements are 
-    2-tuples for min, max powers for that key. Powers can be negative.
-"""
 def get_poly_terms(predictvars, pwr_range):
-
+    """
+    Produces powers of predictor vars for a candidate model to use with 
+    statsmodels. 
+    
+    predictvars: pandas.DataFrame.
+        Contains predictor vars for model.
+    pwr_range: dict.
+        Keys are a subset of the columns in predictvars. Elements are 
+        2-tuples for min, max powers for that key. Powers can be negative.
+    """
     modelvars = pd.DataFrame({}) # Will hold all vars to use with model.
     
     for key in pwr_range.keys():
@@ -100,20 +98,25 @@ def get_poly_terms(predictvars, pwr_range):
     return modelvars
     
 
-"""
-Get cross-calibration formula for either dD or d18O.
-
-Fit Pic1 isotope measurements to a polynomial of Pic2 log(q) and isotope 
-measurements, including an interaction term. Use a weighted linear regression 
-from the statsmodels package (weights are the water concentrations). 
-
-'df' is the pandas dataframe of wisper measurements. 'iso' is the isotope to 
-get cross-cal formula for (can be either 'dD' or 'd18O'). 'nord' is 3-tuple of 
-ints, corresponding to the highest power to include for each predictor 
-variable: logq, isotope-ratio, and their crossterm.
-"""
 def isoxcal_modelfit(df, iso, nord):
-
+    """
+    Determine polynomial fit for isotope ratio cross-calibration data.
+    
+    Fit Pic1 isotope measurements to a polynomial of Pic2 log(q) and isotope 
+    measurements (either dD or d18O), including an interaction term. Use a 
+    weighted linear regression from the statsmodels package (weights are the 
+    water concentrations). 
+    
+    df: pandas.DataFrame. 
+        WISPER measurements. 
+    
+    iso: str.
+        The isotope to get cross-cal formula for (either 'dD' or 'd18O'). 
+        
+    nord: is 3-tuple of ints. 
+        The highest power to include for each of the predictor variables logq, 
+        isotope-ratio, and their crossterm (in that order).
+    """
     # Pandas df of predictor vars:
     interterm = np.log(df['h2o_tot2'])*df[iso+'_tot2'] # Interaction term.
     predictvars = pd.DataFrame({'logq':np.log(df['h2o_tot2']),
@@ -130,17 +133,21 @@ def isoxcal_modelfit(df, iso, nord):
                       weights=df['h2o_tot2']).fit()
 
     
-"""
-The isotope cross-calibration model. Takes in model parameters and 
-data for the predictor variables (logq, iso, logq*iso), and returns calibrated 
-isotope ratios. iso is either 'dD' or 'd18O'.
-
-predvars: dict-like containing values of the predictor vars (arrays of same length).
-pars: fit parameters (dict-like). The keys for the fit parameters need to be 
-    of the form 'var^n' where n is the power of the term in the model and 'var' 
-    is the key for the appropriate variable in 'data'.
-"""
 def model_isoxcal(predvars, pars):
+    """
+    The isotope cross-calibration model (results of the polynomial fit). Takes 
+    in model parameters and data for the predictor variables (logq, iso, 
+    logq*iso), and returns calibrated isotope ratios. iso is either 'dD' or 
+    'd18O'.
+    
+    predvars: dict-like.
+        Contains values of the predictor vars (arrays of same length).
+        
+    pars: (dict-like). 
+        Fit parameters. The dict keys need to be of the form 'var^n' where n 
+        is the power of the term in the model and 'var' is the key for the 
+        appropriate variable in 'data'.
+    """
     terms = []
     
     for k in pars.keys():
@@ -164,12 +171,15 @@ def model_residual_map(iso, wisperdata, pars, logq_grid, iso_grid, ffact=1):
     # Model residuals:
     res = abs(modelresults - wisperdata[iso+'_tot1'])
     # Get RMSE 2d map using oversampling:
-    return hmath.oversampler(res, logq, wisperdata[iso+'_tot2'], 
-                             logq_grid, iso_grid, ffact=ffact)          
+    return oversampler.oversampler(res, logq, wisperdata[iso+'_tot2'], 
+                                   logq_grid, iso_grid, ffact=ffact)          
         
     
 def draw_fitfig(year, wisperdata, pars_dD, pars_d18O):
-
+    """
+    Publication read figure. Colored scatter plot of cross-calibration data 
+    and 2D colored-contour maps of the polynomial fit, for both dD and d18O.
+    """
     fig = plt.figure(figsize=(6.5,2.5))
     ax_D = plt.axes([0.125,0.2,0.29,0.75])
     cbax_D = plt.axes([0.435,0.2,0.02,0.625])
@@ -274,110 +284,101 @@ def draw_fitfig(year, wisperdata, pars_dD, pars_d18O):
     cbax_18O.set_title(r'$\delta^{18} O_1$'+'\n'+u'(\u2030)', fontsize=10)
     plt.setp(cbax_18O.yaxis.get_majorticklabels(), 
          ha="center", va="center", rotation=-90, rotation_mode="anchor")
-    
     ##-------------------------------------------------------------------------
 
 
-
-## Save fit results to my calibration fits excel file:
-##-----------------------------------------------------------------------------    
-
-def get_fits():
-
+def get_fits_singleyear(year, wisperdata):
     """
-    Get cross-calibration formula fit parameters for water concentration and both 
-    isotopologues for an ORACLES year (either '2017' or '2018'). Return as a 
-    dictionary of pandas Series objects.
-    """
-    def get_fits_year(year):
-            
-        wisperdata = get_wisperdata(year)
+    Get cross-cal fit parameters for water concentration and each isotope ratio 
+    for a single ORACLES year. Return as a dict of pandas.Series objects.
+    
+    year: str, '2017' or '2018'.
+    
+    wisperdata: pandas.DataFrame. Contains all WISPER data for the year.
+    """            
+    print("****************************************************\n"
+      "Cross-calibration fit parameters for ORACLES "+year+"\n"
+      "****************************************************")
+    
 
-        ## Fitting humidity is straightforward:
-        model_q = q_xcal(wisperdata) # Returned as statsmodels results object
+    ## Fitting humidity is straightforward:
+    ##-----------------
+    model_q = q_xcal(wisperdata) # Returned as statsmodels results object
+    #print(model_q.summary())
+    print('q\n===')
+    print('R2 = %f' % model_q.rsquared)
 
-        ## Fitting the iso ratios requires polynomial model selection:
+
+    ## Fitting the iso ratios requires polynomial model selection:
+    ##-----------------
+    def polyord_minBIC(wisperdata, iso):
         """
         Using min Bayesian info criterion (BIC) to determine highest power 
-        (up to 5) of each predictor var and crossterm, for the chosen isotope 
-        variable. Returns a 3-tuple of ints, where each is the highest power 
-        to raise the predictor vars: logq, iso, and logq*iso. iso is either 
-        'dD' or 'd18O':
+        (up to 5) of each predictor var and crossterm, for the chosen 
+        isotopologue. Returns a 3-tuple of ints, where each is the highest 
+        power to raise the predictor vars: logq, iso, and logq*iso. iso is 
+        either 'dD' or 'd18O':
         """
-        def polyord_minBIC(wisperdata, iso):
-            # Cartesian product of all poly orders up to 5:
-            nord_list = list(itertools.product(range(1,6), range(1,6), range(1,6)))
-            bic_list = []
-            for nord in nord_list:
-                model = isoxcal_modelfit(wisperdata, iso, nord) # Statsmodels results.
-                bic_list.append(model.bic) # Append this run's BIC.
-            # Combo of poly orders with the minimum BIC:
-            return nord_list[np.argmin(bic_list)]
+        # Cartesian product of all poly orders up to 5:
+        nord_list = list(itertools.product(range(1,6), range(1,6), range(1,6)))
+        bic_list = []
+        for nord in nord_list:
+            model = isoxcal_modelfit(wisperdata, iso, nord) # Statsmodels results.
+            bic_list.append(model.bic) # Append this run's BIC.
+        # Combo of poly orders with the minimum BIC:
+        return nord_list[np.argmin(bic_list)]
 
-            # Find polynomial orders for each iso ratio. Then re-run fit with 
-            # those poly orders:
-        nord_dD = polyord_minBIC(wisperdata, 'dD')
-        nord_d18O = polyord_minBIC(wisperdata, 'd18O')
-        model_dD = isoxcal_modelfit(wisperdata, 'dD', nord_dD)
-        model_d18O = isoxcal_modelfit(wisperdata, 'd18O', nord_d18O)
-        
-        ## Print results:
-        print("****************************************************\n"
-              "****************************************************\n"
-              "Cross-calibration fit parameters for ORACLES "+year+"\n"
-              "****************************************************\n"
-              "****************************************************")
-        #print(model_q.summary())
-        #print(model_dD.summary())
-        #print(model_d18O.summary())
-        print('\nq\n===')
-        print('R2 = %f' % model_q.rsquared)
-
-        print('\ndD\n===')
-        print('nord = % s' % str(nord_dD))
-        print('R2 = %f' % model_dD.rsquared)
-        
-        print('\nd18O\n====')
-        print('nord = % s' % str(nord_d18O))
-        print('R2 = %f' % model_d18O.rsquared)
-
+    # Find optimal polynomial orders for each iso ratio. Then re-run fit with 
+    # those poly orders:
+    nord_dD = polyord_minBIC(wisperdata, 'dD')
+    nord_d18O = polyord_minBIC(wisperdata, 'd18O')
+    model_dD = isoxcal_modelfit(wisperdata, 'dD', nord_dD)
+    model_d18O = isoxcal_modelfit(wisperdata, 'd18O', nord_d18O)
     
-        ## Figure of data with fit:
-        draw_fitfig(year, wisperdata, model_dD.params, model_d18O.params)
+    #print(model_dD.summary())
+    #print(model_d18O.summary())
+    print('\ndD\n===')
+    print('nord = % s' % str(nord_dD))
+    print('R2 = %f' % model_dD.rsquared)    
+    print('\nd18O\n====')
+    print('nord = % s' % str(nord_d18O))
+    print('R2 = %f' % model_d18O.rsquared)
 
-        
-        ## Return parameter fits:
-        return {'q':model_q.params, 'dD':model_dD.params, 'd18O':model_d18O.params}
+
+    ## Draw figures and return parameter fits:
+    ##-----------------
+    draw_fitfig(year, wisperdata, model_dD.params, model_d18O.params)
+    return {'q':model_q.params, 'dD':model_dD.params, 'd18O':model_d18O.params}
 
 
+def get_fits():
     """
-    Save pandas dataframe (data) as a new excel sheet (with name 'newsheetname'), 
-    to a workbook (at path='path_workbook'). If workbook doesn't exist, create it.
-    """
-    def add_excel_sheet(path_workbook, data, newsheetname):
+    Get cross-calibration formula fit parameters for water concentration and 
+    both isotopologues for both the 2017 and 2018 ORACLES years.
+    """  
+    ## Check that all WISPER files with calibrated Pic1 data are in the 
+    ## necessary directory, otherwise run calibration script to get them:
+    ##-----------------        
+        # 'paths_data' should be the paths of all the files if they exist:
+    datesall_good = pic1cal.dates2017_good + pic1cal.dates2018_good        
+    path_data_dir = pic1cal.path_pic1caldir # directory with data files.
+    fnames = ['WISPER_pic1cal_%s.ict' % d for d in datesall_good]
+    paths_data = [path_data_dir+f for f in fnames]
+
+    print("Checking that all WISPER 2017 and 2018 pic1-calibrated files "
+          "exist. For any that don't, running code to get calibrated files.")        
+    for i in range(len(datesall_good)):
+        if os.path.isfile(paths_data[i]):
+            continue
+        else:
+            pic1cal.calibrate_20172018_file(datesall_good[i])
+    print("All files now exist, good to start cross-calibration fits.")
         
-        writer = pd.ExcelWriter(path_workbook, engine='openpyxl')
     
-        if os.path.isfile(path_workbook): # Workbook exists. Add sheets.
-            book = load_workbook(path_workbook)
-            writer.book = book
-            
-            # ExcelWriter uses writer.sheets to access the sheet. If you leave it 
-            # empty it will not overwrite an existing sheet with the same name.
-            writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-            
-            data.to_excel(writer, newsheetname, index=False)
-            writer.save()
-    
-        else: # Workbook doesn't exist. Create it and save dataframe.     
-            data.to_excel(writer, newsheetname, index=False)
-            writer.save()
-    
-    
-    ## Get fit parameters and save to my calibration fits excel workbook:
-        # Fit parameters for each year:
-    fitparams_2017 = get_fits_year('2017')
-    fitparams_2018 = get_fits_year('2018')
+    ## Fit parameters for each year:
+    ##-----------------
+    fitparams_2017 = get_fits_singleyear('2017', get_wisperdata('2017'))
+    fitparams_2018 = get_fits_singleyear('2018', get_wisperdata('2018'))
     
     """
         # For each cross-cal variable, make a single pandas df with parameters from 
@@ -410,44 +411,27 @@ if __name__=='__main__':
 
 
 
-## Look at fit parameter covariances and correlations:
-#cov = cov = model.cov_params().values # Covariance matrix.
-#Dinv = np.diag(1 / np.sqrt(np.diag(cov))) 
-#corr = (Dinv @ cov) @ Dinv
-#print(corr)
-
-
-## Publication-ready plot of 2D cross-cal maps:
-##-----------------------------------------------------------------------------    
 """
-    # Compute cross-calibration values on (logq, delta) grids:
-logq1=np.log(100); logq2=np.log(22000); dD1=-450; dD2=0; d18O1=-55; d18O2=0
-logq_grid, dD_grid = np.meshgrid((np.linspace(logq1, logq2, 200)), 
-                                 np.linspace(dD1, dD2, 100))
-logq_grid, d18O_grid = np.meshgrid((np.linspace(logq1, logq2, 200)), 
-                                 np.linspace(d18O1, d18O2, 100))
-dD_cal = xcal_dD(logq_grid, dD_grid, dict(model_dD.params))
-d18O_cal = xcal_d18O(logq_grid, d18O_grid, dict(model_d18O.params))
-
-    # Plot:
-fig_pub = plt.figure()
-ax1_pub = plt.subplot(1,2,1)    
-ax2_pub = plt.subplot(1,2,2)
-
-pc_dD = ax1_pub.scatter(logq_grid.flatten(), dD_grid.flatten(), 
-                        c=dD_cal.flatten())
-pc_d18O = ax2_pub.scatter(logq_grid.flatten(), d18O_grid.flatten(), 
-                          c=d18O_cal.flatten())
-
-fig_pub.colorbar(pc_dD, ax=ax1_pub)
-fig_pub.colorbar(pc_d18O, ax=ax2_pub)
-
-ax1_pub.set_xlim(logq1, logq2); ax1_pub.set_ylim(dD1, dD2)
-ax2_pub.set_xlim(logq1, logq2); ax2_pub.set_ylim(d18O1, d18O2)
-
-ax1_pub.set_xlabel('Pic2 log(q[ppmv])', fontsize=14)
-ax1_pub.set_ylabel(r'Pic2 $\delta$D [permil]', fontsize=14)
-ax2_pub.set_xlabel('Pic2 log(q[ppmv])', fontsize=14)
-ax2_pub.set_ylabel(r'Pic2 $\delta^{18}$O [permil]', fontsize=14)    
+Save pandas dataframe (data) as a new excel sheet (with name 'newsheetname'), 
+to a workbook (at path='path_workbook'). If workbook doesn't exist, create it.
 """
-##----------------------------------------------------------------------------- 
+"""
+def add_excel_sheet(path_workbook, data, newsheetname):
+    
+    writer = pd.ExcelWriter(path_workbook, engine='openpyxl')
+
+    if os.path.isfile(path_workbook): # Workbook exists. Add sheets.
+        book = load_workbook(path_workbook)
+        writer.book = book
+        
+        # ExcelWriter uses writer.sheets to access the sheet. If you leave it 
+        # empty it will not overwrite an existing sheet with the same name.
+        writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
+        
+        data.to_excel(writer, newsheetname, index=False)
+        writer.save()
+
+    else: # Workbook doesn't exist. Create it and save dataframe.     
+        data.to_excel(writer, newsheetname, index=False)
+        writer.save()
+"""

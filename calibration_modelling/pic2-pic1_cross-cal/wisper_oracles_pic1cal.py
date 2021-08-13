@@ -7,6 +7,17 @@ Created on Thu Aug  5 15:28:54 2021
 Performs preprocessing and full Pic1 calibration for all 2017 and 2018 WISPER 
 files to use for the Pic2-Pic1 cross-calibration modelling. Calibrated files 
 are placed in a folder within the 'pic2-pic1_cross-cal' directory.
+
+Run fxn "calibrate_20172018_allfiles()" to get all 2017 and 2018 files 
+calibrated for Pic1. Saves results in directory "path_pic1caldir".
+
+Functions list
+--------------
+calibrate_20172018_file: 
+    Run this to get calibrated data for a single ORACLES date.
+    
+calibrate_20172018_allfiles:
+    Run this to get calibrated data for all ORACLES dates.
 """
 
 # Built in:
@@ -59,11 +70,7 @@ def calibrate_20172018_file(date):
     del pre, data_syncd, data_pic1cal
     
 
-for date in dates2017_good: calibrate_20172018_file(date)
-for date in dates2018_good: calibrate_20172018_file(date)
-
-
-
-
-
-
+def calibrate_20172018_allfiles():
+    for date in dates2017_good: calibrate_20172018_file(date)
+    for date in dates2018_good: calibrate_20172018_file(date)
+    
