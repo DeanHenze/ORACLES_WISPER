@@ -4,14 +4,58 @@ Created on Thu Mar 11 10:47:32 2021
 
 @author: Dean
 
-Cross calibration of Pic2 (Gulper) to Pic1 (Mako). This is done for all 2017 
-and 2018 flights - where there is data - other than Aug. 12th and 13th, 2017. 
-For those two flights, Mako's calibration was clearly off.
+Identify cross-calibration models and tune model parameters for Pic2 vs Pic1 
+water concentration and isotope ratios. Separate models are tuned for ORACLES 
+2017 and 2018. For each year, all dates where there is good WISPER data are 
+used; For 2017, Aug. 12th and 13th, 2017, Mako's calibration was clearly off 
+and so these flights are omitted.
 
-Notes:
-    I get the statsmodels message:
-        "The condition number is large, 8.17e+03. This might indicate that there are
-        strong multicollinearity or other numerical problems." 
+For water concentration, the model is assumed to be a line 
+passing through the origin and therefore only the slope needs to be tuned.
+
+For the isotope ratios, the cross-cal model is assumed to be a polynomial 
+function of Pic2-measured water concentration (q), the respective isotope 
+ratio delta value (del), and their cross term. The highest power for each of 
+these three terms is identified by minimizing the Beyesian Information 
+Criterion. 
+
+The water concentration slopes and the linear coefficients for the optimized 
+polynomial models are saved as *.csv files in this folder. Publication-ready 
+figures are also generated and saved in this folder.
+
+Function list (ordered by relevance)
+=============
+
+get_fits: 
+    Main function. Run this to get parameter fits and figures for both years.
+
+get_fits_singleyear: 
+    Called by 'get_fits()'.
+    
+qxcal_modelfit:
+    Tune the slope for a water concentration linear model. 
+    
+isoxcal_modelfit:
+    Tune the coefficients for terms in an isotope ratio polynomial model with 
+    predictor variables q, del, and q*del.
+    
+get_poly_terms:
+     Generates a pd.DataFrame of all needed powers of predictor vars. Used by 
+     'isoratioxcal_modelfit()'.
+     
+model_isoxcal:
+    Returns predictions for an isotope ratio cross-calibration model. E.g. 
+    once a candidate polynomial model has been identified and parameters 
+    tuned using 'isoxcal_modelfit()', this function will use the candidate 
+    function to generate cross-calibrated pic2 measurements.
+
+draw_fitfig, model_residual_map: 
+    The two functions used to make the figures. 'draw_fitfig' is the main 
+    function. 'model_residual_map' generates a 2D map of model residuals 
+    that can be used as contour plots.
+
+get_wisperdata:
+    Returns all WISPER data for a single ORACLES year.
 """
 
 
@@ -63,7 +107,7 @@ def get_wisperdata(year):
     return wisper.dropna(how='any') # Drop missing values
 
 
-def q_xcal(df):
+def qxcal_modelfit(df):
     """
     Fit a line to Pic1 vs Pic2 vapor concentration. Line is constrained to pass
     through the origin. 'df' is the pandas dataframe of wisper measurements.
@@ -161,6 +205,9 @@ def model_isoxcal(predvars, pars):
 
 
 def model_residual_map(iso, wisperdata, pars, logq_grid, iso_grid, ffact=1):
+    """
+    Returns a 2D, q-dD map of residuals for an isotope cross calibration. 
+    """
     # Get model predictions:
     logq = np.log(wisperdata['h2o_tot2'].values)
     predictorvars = {'logq':logq, 
@@ -178,7 +225,8 @@ def model_residual_map(iso, wisperdata, pars, logq_grid, iso_grid, ffact=1):
 def draw_fitfig(year, wisperdata, pars_dD, pars_d18O):
     """
     Publication read figure. Colored scatter plot of cross-calibration data 
-    and 2D colored-contour maps of the polynomial fit, for both dD and d18O.
+    and 2D colored-contour maps of the polynomial fit, for both dD and d18O. 
+    Figures are saved in this folder.
     """
     fig = plt.figure(figsize=(6.5,2.5))
     ax_D = plt.axes([0.125,0.2,0.29,0.75])
@@ -285,12 +333,18 @@ def draw_fitfig(year, wisperdata, pars_dD, pars_d18O):
     plt.setp(cbax_18O.yaxis.get_majorticklabels(), 
          ha="center", va="center", rotation=-90, rotation_mode="anchor")
     ##-------------------------------------------------------------------------
+    
+    fig.savefig("pic2_isoratio_xcal_fitresults_%s.png" % year)
 
 
 def get_fits_singleyear(year, wisperdata):
     """
-    Get cross-cal fit parameters for water concentration and each isotope ratio 
-    for a single ORACLES year. Return as a dict of pandas.Series objects.
+    Get cross-cal models and fit parameters for water concentration and each 
+    isotope ratio for a single ORACLES year. Return as a dict of pandas.Series 
+    objects.
+    
+    Polynomial form of model for isotope ratios is identified by minimizing 
+    the Beyesian Information Criterion.
     
     year: str, '2017' or '2018'.
     
@@ -303,7 +357,7 @@ def get_fits_singleyear(year, wisperdata):
 
     ## Fitting humidity is straightforward:
     ##-----------------
-    model_q = q_xcal(wisperdata) # Returned as statsmodels results object
+    model_q = qxcal_modelfit(wisperdata) # Returned as statsmodels results object
     #print(model_q.summary())
     print('q\n===')
     print('R2 = %f' % model_q.rsquared)
@@ -360,7 +414,8 @@ def get_fits():
     ## necessary directory, otherwise run calibration script to get them:
     ##-----------------        
         # 'paths_data' should be the paths of all the files if they exist:
-    datesall_good = pic1cal.dates2017_good + pic1cal.dates2018_good        
+    datesall_good = (pic1cal.dates2017_good + 
+                     pic1cal.dates2018_good) # All relevant P3 flight dates.        
     path_data_dir = pic1cal.path_pic1caldir # directory with data files.
     fnames = ['WISPER_pic1cal_%s.ict' % d for d in datesall_good]
     paths_data = [path_data_dir+f for f in fnames]
@@ -380,58 +435,27 @@ def get_fits():
     fitparams_2017 = get_fits_singleyear('2017', get_wisperdata('2017'))
     fitparams_2018 = get_fits_singleyear('2018', get_wisperdata('2018'))
     
-    """
-        # For each cross-cal variable, make a single pandas df with parameters from 
-        # both years:
-    def make_fitparam_df(crosscalvar): # crosscalvar (str) = a dict key.
-        fitpar_df = pd.DataFrame([dict(fitparams_2017[crosscalvar]), 
-                                  dict(fitparams_2018[crosscalvar])], 
-                                 index=['2017','2018'])
-        fitpar_df['year'] = fitpar_df.index.values
-        return fitpar_df
     
-    params_h2o = make_fitparam_df('q')
-    params_dD = make_fitparam_df('dD')
-    params_d18O = make_fitparam_df('d18O')
-       
-        # Write to excel sheets:
-    sheetnames = ['pic2pic1_xcal_h2o','pic2pic1_xcal_dD','pic2pic1_xcal_d18O']
-    params_ready2write = [params_h2o, params_dD, params_d18O]
-
-    relpath_caltable = r'../Calibration_Data/calibration_fits.xlsx' 
-    for param_df, sheetname in zip(params_ready2write, sheetnames):
-        add_excel_sheet(relpath_caltable, param_df, sheetname)
-    """
+    ## Save H2O xcal fit results to this folder:
+    ##-----------------
+    slope2017 = fitparams_2017['q']['h2o_tot2']
+    slope2018 = fitparams_2018['q']['h2o_tot2']
+    h2o_xcal_df = pd.DataFrame({'year':['2017','2018'], 
+                                'slope':[slope2017,slope2018]}, 
+                               columns=['year','slope'])
+    h2o_xcal_df.to_csv("h2o_xcal_results.csv", index=False)
     
-##-----------------------------------------------------------------------------
 
-
-if __name__=='__main__':
-    get_fits()  
-
-
-
-"""
-Save pandas dataframe (data) as a new excel sheet (with name 'newsheetname'), 
-to a workbook (at path='path_workbook'). If workbook doesn't exist, create it.
-"""
-"""
-def add_excel_sheet(path_workbook, data, newsheetname):
+    ## Save H2O xcal fit results to this folder:
+    ##-----------------
+    def isoratio_xcal_to_csv(fitparams_s, fname):
+        # fitparams_s: fit results as pd.Series.
+        fitparams_df = pd.DataFrame({'predictor_var':fitparams_s.index,
+                                     'coeff':fitparams_s.values},
+                                    columns=['predictor_var','coeff'])
+        fitparams_df.to_csv(fname, index=False)
     
-    writer = pd.ExcelWriter(path_workbook, engine='openpyxl')
-
-    if os.path.isfile(path_workbook): # Workbook exists. Add sheets.
-        book = load_workbook(path_workbook)
-        writer.book = book
-        
-        # ExcelWriter uses writer.sheets to access the sheet. If you leave it 
-        # empty it will not overwrite an existing sheet with the same name.
-        writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-        
-        data.to_excel(writer, newsheetname, index=False)
-        writer.save()
-
-    else: # Workbook doesn't exist. Create it and save dataframe.     
-        data.to_excel(writer, newsheetname, index=False)
-        writer.save()
-"""
+    isoratio_xcal_to_csv(fitparams_2017['dD'], "dD_xcal_results_2017.csv")
+    isoratio_xcal_to_csv(fitparams_2017['d18O'], "d18O_xcal_results_2017.csv")
+    isoratio_xcal_to_csv(fitparams_2018['dD'], "dD_xcal_results_2018.csv")
+    isoratio_xcal_to_csv(fitparams_2018['d18O'], "d18O_xcal_results_2018.csv")
