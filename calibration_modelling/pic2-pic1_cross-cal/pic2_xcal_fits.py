@@ -4,11 +4,12 @@ Created on Thu Mar 11 10:47:32 2021
 
 @author: Dean
 
-Identify cross-calibration models and tune model parameters for Pic2 vs Pic1 
-water concentration and isotope ratios. Separate models are tuned for ORACLES 
-2017 and 2018. For each year, all dates where there is good WISPER data are 
-used; For 2017, Aug. 12th and 13th, 2017, Mako's calibration was clearly off 
-and so these flights are omitted.
+Run this script to identify cross-calibration models and tune model parameters 
+for Pic2 vs Pic1 water concentration and isotope ratios. 
+
+Separate models are tuned for ORACLES 2017 and 2018. For each year, all dates 
+where there is good WISPER data are used; For 2017, Aug. 12th and 13th, 2017, 
+Mako's calibration was clearly off and so these flights are omitted.
 
 For water concentration, the model is assumed to be a line 
 passing through the origin and therefore only the slope needs to be tuned.
@@ -27,7 +28,8 @@ Function list (ordered by relevance)
 =============
 
 get_fits: 
-    Main function. Run this to get parameter fits and figures for both years.
+    This fxn is run during a call to main, and calls all fxns below either 
+    directly or indirectly. Gets parameter fits and figures for both years.
 
 get_fits_singleyear: 
     Called by 'get_fits()'.
@@ -459,3 +461,7 @@ def get_fits():
     isoratio_xcal_to_csv(fitparams_2017['d18O'], "d18O_xcal_results_2017.csv")
     isoratio_xcal_to_csv(fitparams_2018['dD'], "dD_xcal_results_2018.csv")
     isoratio_xcal_to_csv(fitparams_2018['d18O'], "d18O_xcal_results_2018.csv")
+
+
+if __name__ == '__main__':
+    get_fits()
