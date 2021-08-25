@@ -45,13 +45,11 @@ def data_with_pressure(df_wisper, date):
     Inputs
     ------
     df_wisper: pandas df.
-        WISPER data for a single flight.
+        WISPER data for a single flight, -9999.0 flags replace with np.nan.
         
     date: str.
         Flight date 'yyyymmdd'.
     """    
-    # Make sure missing value flags in WISPER data are replaced with NANs:
-    df_wisper.replace(-9999.0, np.nan, inplace=True)
 
     # Load P3 merge data as nc dataset (has the pressure data):
     path_p3merge = scriptpath + "\\P3_merge_data\\"

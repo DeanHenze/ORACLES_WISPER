@@ -14,16 +14,16 @@ ratios).
 
 Main functions to run
 ---------------------
-fullcal_singlefile: Main function to run. Calibrates Pic2 data for a single 
+apply_cal: Main function to run. Calibrates Pic2 data for a single 
     WISPER file.
 
 
 List of other Functions
 -----------------------
-fullcal_2016file, fullcal_20172018file: Called by 'fullcal_singlefile()'.
+apply_cal_2016file, apply_cal_20172018file: Called by 'apply_cal()'.
 
 crosscalibrate_h2o, crosscalibrate_dD_d18O: Cross calibration functions 
-    called by 'fullcal_20172018file()'.
+    called by 'apply_cal_20172018file()'.
 """
 
 
@@ -33,15 +33,51 @@ import pandas as pd # 1.1.3
 import matplotlib.pyplot as plt # 3.3.2
 
 # Pic2 calibration fxns for ORACLES 2016 are taken from the pic1_cal script:
-from pic1_cal import q_dep_cal, abscal_line
+from pic1_cal import q_dep_cal, abs_cal
 
 
-def fullcal_2016file(wisperdata, pic):
+def apply_cal(wisperdata, date, testplots=False):
+    """
+    Calibration of Pic2 water concentration and isotope ratios for a single file.
+
+    wisperdata: pandas.DataFrame. 
+        WISPER data with Pic2 measurements. Should have all -9999.0 flags 
+        replaced with np.nan.
+        
+    date: str. 
+        ORACLES flight data 'yyyymmdd' corresponding to wisperdata.
+        
+    testplots: bool, default=False.
+        Set to True for test plots of the calibration.
+    
+    Returns:
+        wisperdata with the Pic2 measurements modified in place.
+    """    
+    wisper_precal = wisperdata.copy()
+    
+    if date[:4] == '2016': 
+        if date in ['20160830','20160831','20160902','20160904']:
+            pic = 'Mako'
+        else:
+            pic = 'Gulper'
+        wisperdata = applycal_2016file(wisperdata, pic)
+        
+    elif date[:4] in ['2017','2018']:
+        wisperdata = applycal_20172018file(wisperdata, int(date[:4]))
+        
+    # Optional test plots:
+    if testplots:
+        test_plots(wisper_precal, wisperdata, date)
+        
+    return wisperdata
+
+
+def applycal_2016file(wisperdata, pic):
     """
     Calibration of Pic2 water concentration and isotope ratios for a single 
     2016 file.
     
-    wisperdata: See header for 'fullcal_singlefile()' below.
+    wisperdata: See header for 'fullcal_singlefile()'.
         
     pic: str, either 'Mako' or 'Gulper' for the instrument used.
     
@@ -86,10 +122,10 @@ def fullcal_2016file(wisperdata, pic):
     wisperdata['d18O_tot2'] = q_dep_cal(wisperdata['d18O_tot2'], 
                                         wisperdata['h2o_tot2'], a18O, b18O)
         # Isotope ratio absolute calibration:
-    wisperdata['dD_tot2'] = abscal_line(wisperdata['dD_tot2'], mD, kD)
-    wisperdata['d18O_tot2'] = abscal_line(wisperdata['d18O_tot2'], m18O, k18O)    
+    wisperdata['dD_tot2'] = abs_cal(wisperdata['dD_tot2'], mD, kD)
+    wisperdata['d18O_tot2'] = abs_cal(wisperdata['d18O_tot2'], m18O, k18O)    
         # Humidity absolute calibration:
-    wisperdata['h2o_tot2'] = abscal_line(wisperdata['h2o_tot2'], mq, kq)
+    wisperdata['h2o_tot2'] = abs_cal(wisperdata['h2o_tot2'], mq, kq)
 
     return wisperdata
 
@@ -98,7 +134,7 @@ def crosscalibrate_h2o(wisperdata, year):
     """
     Cross-calibrates Pic2 water concentration for ORACLES 2017 and 2018.
     
-    wisperdata, year: See header for 'fullcal_20172018file()' below.
+    wisperdata, year: See header for 'applycal_20172018file()'.
 
     Returns:
         wisperdata with the Pic2 water concentration modified in place.
@@ -110,6 +146,7 @@ def crosscalibrate_h2o(wisperdata, year):
     
     # Return calibrated h2o:
     wisperdata['h2o_tot2'] = slope*wisperdata['h2o_tot2']
+    return wisperdata
 
 
 def crosscalibrate_dD_d18O(wisperdata, year):
@@ -117,7 +154,7 @@ def crosscalibrate_dD_d18O(wisperdata, year):
     Cross-calibrates Pic2 dD and d18O for ORACLES 2017 and 2018. Uses the 
     results of the polynomial fit derived elsewhere. 
     
-    wisperdata, year: See header for 'fullcal_20172018file()' below.
+    wisperdata, year: See header for 'applycal_20172018file()' below.
     
     Returns:
         wisperdata with the Pic2 isotope ratios modified in place.
@@ -133,44 +170,47 @@ def crosscalibrate_dD_d18O(wisperdata, year):
                                 })
     
     
-    # Load cross-calibration model parameters and pandas.DataFrame's:
+    # Load cross-calibration model parameters as pandas.DataFrame's and 
+    # recast as dictionaries where keys are the predictor_var column:
     dir_pars = r"../calibration_modelling/pic2-pic1_cross-cal/"
-    pars_d18O = pd.read_csv(dir_pars + ("d18O_xcal_results_%i.csv" % year))
-    pars_dD = pd.read_csv(dir_pars + ("dD_xcal_results_%i.csv" % year))
+    p_d18O_df = pd.read_csv(dir_pars + ("d18O_xcal_results_%i.csv" % year))
+    p_dD_df = pd.read_csv(dir_pars + ("dD_xcal_results_%i.csv" % year))
+    p_dD_dict = dict(zip(p_dD_df['predictor_var'], p_dD_df['coeff']))
+    p_d18O_dict = dict(zip(p_d18O_df['predictor_var'], p_d18O_df['coeff']))
 
 
-    def iso_crosscal(df_xcalvars, modelpars):
+    def iso_crosscal(df_xcalvars, pars_dict):
         """
         Computes and returns the cross-calibrated data. A linear combo of the 
         xcalvars raised to the appropriate power and mulitplied by the 
-        corresponding coefficient in 'modelpars'.
+        corresponding coefficient in 'pars_dict' (dictionary).
         """
         terms = [] # Will store each term (var^pow*coeff) in the linear combo.
     
-        for k in modelpars.keys():
+        for k in pars_dict.keys():
             if k=='const':
-                terms.append(modelpars[k]*np.ones(np.shape(df_xcalvars)[0]))
+                terms.append(pars_dict[k]*np.ones(np.shape(df_xcalvars)[0]))
             else:
                 # Get the xcal-var name and power it needs to be raised to:
                 varname, power = k.split('^')
                 # Compute term:
-                terms.append(modelpars[k]*df_xcalvars[varname]**int(power))
+                terms.append(pars_dict[k]*df_xcalvars[varname]**int(power))
         
         return np.sum(terms, axis=0)
     
     
     # Apply cross-calibration and return:
-    wisperdata['dD_tot2'] = iso_crosscal(df_xcalvars, pars_dD)
-    wisperdata['d18O_tot2'] = iso_crosscal(df_xcalvars, pars_d18O)
+    wisperdata['dD_tot2'] = iso_crosscal(df_xcalvars, p_dD_dict)
+    wisperdata['d18O_tot2'] = iso_crosscal(df_xcalvars, p_d18O_dict)
     return wisperdata
 
 
-def fullcal_20172018file(wisperdata, year):
+def applycal_20172018file(wisperdata, year):
     """
     Calibration of Pic2 water concentration and isotope ratios for a 2017 or 
     2018 file.
 
-    wisperdata: See header for 'fullcal_singlefile()' below.
+    wisperdata: See header for 'fullcal_singlefile()'.
         
     year: int. ORACLES year, either 2017 or 2018.
     
@@ -181,55 +221,70 @@ def fullcal_20172018file(wisperdata, year):
     wisperdata = crosscalibrate_h2o(wisperdata, year)
     return wisperdata
 
-
-def fullcal_singlefile(wisperdata, date):
+    
+def test_plots(precal, postcal, date):
     """
-    Calibration of Pic2 water concentration and isotope ratios for a single file.
+    Test plots. 'precal'', 'postcal' (pandas.DataFrames) are the 
+    WISPER data pre/post calibration for the ORACLES flight on 'date' 
+    (str, 'yyyymmdd').
+    """
 
-    wisperdata: pandas.DataFrame. 
-        WISPER data with Pic2 measurements. Should have all -9999.0 flags 
-        replaced with np.nan.
-        
-    date: str. 
-        ORACLES flight data 'yyyymmdd' corresponding to wisperdata.
-    
-    Returns:
-        wisperdata with the Pic2 measurements modified in place.
-    """    
-    if date[:4] == '2016': 
-        if date in ['20160830','20160831','20160902','20160904']:
-            pic = 'Mako'
-        else:
-            pic = 'Gulper'
-        wisperdata = fullcal_2016file(wisperdata, pic)
-        
+    # Time series before and after cross-cal:
+        # Light running mean:
+    if date[:4] == '2016':
+        vars2smooth = ['dD_tot2','d18O_tot2']
     elif date[:4] in ['2017','2018']:
-        wisperdata = fullcal_20172018file(wisperdata, int(date[:4]))
-        
-    return wisperdata
-    
-    
-"""
-# Optional test plots:
-if testplots:
-    # Pic1 H2O vs Pic2 H2O before and after cross-cal:
+        vars2smooth = ['dD_tot1','dD_tot2','d18O_tot1','d18O_tot2']
+    precal[vars2smooth] = precal[vars2smooth].rolling(window=10).mean()    
+    postcal[vars2smooth] = postcal[vars2smooth].rolling(window=10).mean()    
+        # Plot H2O:
     plt.figure()
-    plt.plot(data['h2o_tot2'], data['h2o_tot1'], 'bo')
-    plt.plot(h2o_corrected, data['h2o_tot1'], 'ro')
-    plt.plot(np.linspace(200,20000,100), np.linspace(200,20000,100), 'k-') # 1-1 line
-
-    # Isotope ratio time series before and after cross-cal:
-    vars2smooth = ['dD_tot1','dD_tot2','d18O_tot1','d18O_tot2']
-    data[vars2smooth] = data[vars2smooth].rolling(window=10).mean()    
-        
+    ax1 = plt.axes()
+    ax1.plot(precal['Start_UTC'], precal['h2o_tot2'], 'b', label='pic2 pre')
+    ax1.plot(postcal['Start_UTC'], postcal['h2o_tot2'], 'r', label='pic2 post')
+        # Plot dD, d18O:
     plt.figure()
-    plt.subplot(2,1,1)
-    plt.plot(data['Start_UTC'], data['dD_tot1'], 'k')
-    plt.plot(data['Start_UTC'], data['dD_tot2'], 'b')
-    plt.plot(data['Start_UTC'], dD_corrected, 'r')
-    plt.subplot(2,1,2)
-    plt.plot(data['Start_UTC'], data['d18O_tot1'], 'k')
-    plt.plot(data['Start_UTC'], data['d18O_tot2'], 'b')
-    plt.plot(data['Start_UTC'], d18O_corrected, 'r')
-"""
+    ax2 = plt.subplot(2,1,1)
+    ax2.plot(precal['Start_UTC'], precal['dD_tot2'], 'b', label='pic2 pre')
+    ax2.plot(postcal['Start_UTC'], postcal['dD_tot2'], 'r', label='pic2 post')
+    ax3 = plt.subplot(2,1,2)
+    ax3.plot(precal['Start_UTC'], precal['d18O_tot2'], 'b', label='pic2 pre')
+    ax3.plot(postcal['Start_UTC'], postcal['d18O_tot2'], 'r', label='pic2 post')
+        # If a 2017 and 2018 flight, also plot Pic1 vars:
+    if date[:4] in ['2017','2018']:
+        ax1.plot(precal['Start_UTC'], precal['h2o_tot1'], 'k', label='pic1')
+        ax2.plot(precal['Start_UTC'], precal['dD_tot1'], 'k', label='pic1')
+        ax3.plot(precal['Start_UTC'], precal['d18O_tot1'], 'k', label='pic1')
+       
+        
+    # Pic1 H2O vs Pic2 H2O before and after cross-cal for 2017 or 2018:
+    if date[:4] in ['2017','2018']:
+        plt.figure()
+        ax4 = plt.axes()
+        ax4.plot(precal['h2o_tot2'], precal['h2o_tot1'], 'bo', label='pre cal')
+        ax4.plot(postcal['h2o_tot2'], postcal['h2o_tot1'], 'ro', label='post cal')
+            # 1-1 line:
+        ax4.plot(np.linspace(200,20000,100), np.linspace(200,20000,100), 
+                 'k-', label='1-1 line.')
 
+    
+    # Figure labels, legends:
+    ax1.set_title('Test plot for Pic2 H2O calibration, '
+                  'flight on %s' % date, fontsize=14) 
+    ax1.set_xlabel('Time (secs since UTC midnight)', fontsize=14)
+    ax1.set_ylabel('H2O (ppmv)', fontsize=14)
+    ax2.set_title(r'Test plots for Pic2 $\delta$D, $\delta^18$O calibration, '
+                  'flight on %s' % date, fontsize=14)
+    ax2.set_ylabel(r'$\delta$D (permil)', fontsize=14)
+    ax3.set_xlabel('Time (secs since UTC midnight)', fontsize=14)
+    ax3.set_ylabel(r'$\delta^18$O (permil)', fontsize=14)
+    
+    ax1.legend(fontsize=12)
+    ax2.legend(fontsize=12)
+
+    if date[:4] in ['2017','2018']:
+        ax4.set_title('Test plot for Pic2 H2O calibration, '
+                      'flight on %s' % date, fontsize=14)
+        ax4.set_xlabel('Pic2 H2O (ppmv)', fontsize=14)
+        ax4.set_ylabel('Pic1 H2O (ppmv)', fontsize=14)
+        ax4.legend(fontsize=12)

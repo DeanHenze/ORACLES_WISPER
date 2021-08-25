@@ -9,9 +9,14 @@ data files.
 """
 
 
+# Third party:
+import numpy as np
+
+# My modules:
 import preprocess 
 import time_sync
 import pic1_cal
+import pic2_cal
 
 
 # Paths to raw and (to-be) calibrated file directories:
@@ -42,8 +47,11 @@ def calibrate_file(date):
     pre.preprocess_file()
     #pre.test_plots()
     
+    data_prepro = pre.preprodata.copy()
+    data_prepro.replace(-9999, np.nan, inplace=True)
+
     # Time synchronization:
-    data_syncd = time_sync.wisper_tsync(pre.preprodata, date)
+    data_syncd = time_sync.wisper_tsync(data_prepro, date)
     #time_sync.test_plot(pre.preprodata, data_syncd, date)
     
     # Pic1 calibration (only relevant for 2017 and 2018 sampling periods):
@@ -51,16 +59,21 @@ def calibrate_file(date):
         data_pic1cal = pic1_cal.apply_cal(data_syncd, date)
     else: 
         data_pic1cal = data_syncd
+        
+    # Pic2 calibration:
+    data_pic2cal = pic2_cal.apply_cal(data_pic1cal, date, testplots=False)
+    #data_pic2cal = pic2_cal.apply_cal(data_pic1cal, date, testplots=True)
     
     # Save calibrated data:
+    data_pic2cal.fillna(-9999, inplace=True)  
     fname = "WISPER_calibrated_%s.ict" % date
-    data_pic1cal.to_csv(path_caldir + fname, index=False)
+    data_pic2cal.to_csv(path_caldir + fname, index=False)
     
     del pre, data_syncd, data_pic1cal
     
 
-#for date in dates2016_good: calibrate_file(date)
-for date in dates2017_good: calibrate_file(date)
+#for date in dates2016_good[:3]: calibrate_file(date)
+for date in dates2017_good[4:7]: calibrate_file(date)
 #for date in dates2018_good: calibrate_file(date)
 
 

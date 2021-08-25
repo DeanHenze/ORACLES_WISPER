@@ -193,7 +193,7 @@ class Preprocessor(object):
         self.flag_na_switch(preprodata, flag=-99.0, flag2nan=True)        
         
 
-        ## restructure pic0 data so that SDI and CVI inlet 
+        ## restructure Pic1 data so that SDI and CVI inlet 
         ## measurements are separate columns:
         ## -------------------------------
             # split original dataframe Pic1 variables:
@@ -214,6 +214,8 @@ class Preprocessor(object):
                                               ),
                                      how='left'
                                      )
+            # drop old pic1 columns:
+        preprodata.drop(columns=pic1_keys_raw, inplace=True)
 
     
         ## Convert the raw data timestamps to seconds since midnight UTC:

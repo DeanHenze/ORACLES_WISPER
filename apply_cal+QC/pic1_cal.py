@@ -94,15 +94,13 @@ def apply_cal(data, date):
     Apply calibrations to a single WISPER file.
     
     data: pandas DataFrame.
-        Data for a single P3 flight.
+        Data for a single P3 flight, -9999.0 flags replaced with np.nan.
         
     date: str.
         P3 flight date, 'yyyymmdd'.
     """
     print("Calibrating Pic1 for P3 flight %s" % date)
     
-    data.replace(-9999, np.nan, inplace=True)
-
     if date[:4] == '2017': i = 0
     if date[:4] == '2018': i = 1
     
@@ -129,6 +127,4 @@ def apply_cal(data, date):
         # Recalc cloud lwc from corrected cloud h2o:
     data['cvi_lwc'] = 0.622*data['h2o_cld']/1000/data['cvi_enhance']
     
-
-    data.fillna(-9999, inplace=True)  
     return data
