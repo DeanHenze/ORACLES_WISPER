@@ -56,7 +56,8 @@ def calibrate_file(date):
     
     # Pic1 calibration (only relevant for 2017 and 2018 sampling periods):
     if date[:4] in ['2017','2018']:
-        data_pic1cal = pic1_cal.apply_cal(data_syncd, date)
+        #data_pic1cal = pic1_cal.apply_cal(data_syncd, date, testplots=False)
+        data_pic1cal = pic1_cal.apply_cal(data_syncd, date, testplots=True)
     else: 
         data_pic1cal = data_syncd
         

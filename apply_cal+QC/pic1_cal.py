@@ -30,6 +30,7 @@ q_dep_cal, abs_cal:
 
 # Third party:
 import numpy as np # 1.19.2
+import matplotlib.pyplot as plt # 3.3.2
   
 
 ## Parameters for steps (1) and (2) equations in the file header:
@@ -89,17 +90,22 @@ def abs_cal(x, m, k):
     return m*x + k
 
     
-def apply_cal(data, date):
+def apply_cal(data, date, testplots=False):
     """
     Apply calibrations to a single WISPER file.
     
     data: pandas DataFrame.
         Data for a single P3 flight, -9999.0 flags replaced with np.nan.
         
+    testplots: bool, default=False.
+        Set to True for test plots of the calibration.
+        
     date: str.
         P3 flight date, 'yyyymmdd'.
     """
     print("Calibrating Pic1 for P3 flight %s" % date)
+    
+    if testplots: data_precal = data.copy()
     
     if date[:4] == '2017': i = 0
     if date[:4] == '2018': i = 1
@@ -127,4 +133,87 @@ def apply_cal(data, date):
         # Recalc cloud lwc from corrected cloud h2o:
     data['cvi_lwc'] = 0.622*data['h2o_cld']/1000/data['cvi_enhance']
     
+    # Optional test plots:
+    if testplots: test_plots(data_precal, data, date)
+    
     return data
+
+
+def test_plots(precal, postcal, date):
+    """
+    Test plots. 'precal'', 'postcal' (pandas.DataFrames) are the 
+    WISPER data pre/post calibration for the ORACLES flight on 'date' 
+    (str, 'yyyymmdd').
+    """
+
+    # Time series before and after cross-cal:
+        # Light running mean:
+    vars2smooth = ['dD_tot1','d18O_tot1','dD_cld','d18O_cld']
+    precal[vars2smooth] = precal[vars2smooth].rolling(window=10).mean()    
+    postcal[vars2smooth] = postcal[vars2smooth].rolling(window=10).mean()    
+        # Plot total water and cloud water:
+    plt.figure()
+    ax11 = plt.subplot(2,1,1)
+    ax11.plot(precal['Start_UTC'], precal['h2o_tot1'], 'b', label='pic2 pre')
+    ax11.plot(postcal['Start_UTC'], postcal['h2o_tot1'], 'r', label='pic2 post')
+    ax12 = plt.subplot(2,1,2)
+    ax12.plot(precal['Start_UTC'], precal['h2o_cld'], 'b', label='pic2 pre')
+    ax12.plot(postcal['Start_UTC'], postcal['h2o_cld'], 'r', label='pic2 post')
+        # Plot total water dD and cloud water dD:
+    plt.figure()
+    ax21 = plt.subplot(2,1,1)
+    ax21.plot(precal['Start_UTC'], precal['dD_tot1'], 'b', label='pic2 pre')
+    ax21.plot(postcal['Start_UTC'], postcal['dD_tot1'], 'r', label='pic2 post')
+    ax22 = plt.subplot(2,1,2)
+    ax22.plot(precal['Start_UTC'], precal['dD_cld'], 'b', label='pic2 pre')
+    ax22.plot(postcal['Start_UTC'], postcal['dD_cld'], 'r', label='pic2 post')
+        # Plot total water d18O and cloud water d18O:
+    plt.figure()
+    ax31 = plt.subplot(2,1,1)
+    ax31.plot(precal['Start_UTC'], precal['d18O_tot1'], 'b', label='pic2 pre')
+    ax31.plot(postcal['Start_UTC'], postcal['d18O_tot1'], 'r', label='pic2 post')       
+    ax32 = plt.subplot(2,1,2)
+    ax32.plot(precal['Start_UTC'], precal['d18O_cld'], 'b', label='pic2 pre')
+    ax32.plot(postcal['Start_UTC'], postcal['d18O_cld'], 'r', label='pic2 post')
+
+    
+    # Figure labels, legends:
+    ax11.set_title('Test plot for Pic1 H2O calibration, '
+                  'flight on %s' % date, fontsize=14) 
+    ax11.set_ylabel(r'$H2O_{total}$ (ppmv)', fontsize=14)
+    ax12.set_xlabel('Time (secs since UTC midnight)', fontsize=14)
+    ax12.set_ylabel(r'$H2O_{cloud}$ (ppmv)', fontsize=14)
+    
+    ax21.set_title(r'Test plots for Pic1 $\delta$D calibration, '
+                   'flight on %s' % date, fontsize=14)
+    ax21.set_ylabel(r'$\delta D_{total}$ (permil)', fontsize=14)
+    ax22.set_xlabel('Time (secs since UTC midnight)', fontsize=14)
+    ax22.set_ylabel(r'$\delta D_{cloud}$ (permil)', fontsize=14)
+        
+    ax31.set_title(r'Test plots for Pic1 $\delta^{18} O$ calibration, '
+                   'flight on %s' % date, fontsize=14)
+    ax31.set_ylabel(r'$\delta^18 O_{total}$ (permil)', fontsize=14)
+    ax32.set_xlabel('Time (secs since UTC midnight)', fontsize=14)
+    ax32.set_ylabel(r'$\delta^18 O_{cloud}$ (permil)', fontsize=14)
+    
+    ax11.legend(fontsize=12)
+    ax21.legend(fontsize=12)
+    ax31.legend(fontsize=12)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

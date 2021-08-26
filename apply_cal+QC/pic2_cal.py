@@ -53,7 +53,9 @@ def apply_cal(wisperdata, date, testplots=False):
     Returns:
         wisperdata with the Pic2 measurements modified in place.
     """    
-    wisper_precal = wisperdata.copy()
+    print("Calibrating Pic1 for P3 flight %s" % date)
+
+    if testplots: wisper_precal = wisperdata.copy()
     
     if date[:4] == '2016': 
         if date in ['20160830','20160831','20160902','20160904']:
@@ -130,6 +132,23 @@ def applycal_2016file(wisperdata, pic):
     return wisperdata
 
 
+def applycal_20172018file(wisperdata, year):
+    """
+    Calibration of Pic2 water concentration and isotope ratios for a 2017 or 
+    2018 file.
+
+    wisperdata: See header for 'fullcal_singlefile()'.
+        
+    year: int. ORACLES year, either 2017 or 2018.
+    
+    Returns:
+        wisperdata with the Pic2 measurements modified in place.
+    """
+    wisperdata = crosscalibrate_dD_d18O(wisperdata, year)
+    wisperdata = crosscalibrate_h2o(wisperdata, year)
+    return wisperdata
+
+
 def crosscalibrate_h2o(wisperdata, year):
     """
     Cross-calibrates Pic2 water concentration for ORACLES 2017 and 2018.
@@ -202,23 +221,6 @@ def crosscalibrate_dD_d18O(wisperdata, year):
     # Apply cross-calibration and return:
     wisperdata['dD_tot2'] = iso_crosscal(df_xcalvars, p_dD_dict)
     wisperdata['d18O_tot2'] = iso_crosscal(df_xcalvars, p_d18O_dict)
-    return wisperdata
-
-
-def applycal_20172018file(wisperdata, year):
-    """
-    Calibration of Pic2 water concentration and isotope ratios for a 2017 or 
-    2018 file.
-
-    wisperdata: See header for 'fullcal_singlefile()'.
-        
-    year: int. ORACLES year, either 2017 or 2018.
-    
-    Returns:
-        wisperdata with the Pic2 measurements modified in place.
-    """
-    wisperdata = crosscalibrate_dD_d18O(wisperdata, year)
-    wisperdata = crosscalibrate_h2o(wisperdata, year)
     return wisperdata
 
     
