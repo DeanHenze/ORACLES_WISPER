@@ -53,7 +53,7 @@ def apply_cal(wisperdata, date, testplots=False):
     Returns:
         wisperdata with the Pic2 measurements modified in place.
     """    
-    print("Calibrating Pic1 for P3 flight %s" % date)
+    print("Calibrating Pic2 for P3 flight %s" % date)
 
     if testplots: wisper_precal = wisperdata.copy()
     
