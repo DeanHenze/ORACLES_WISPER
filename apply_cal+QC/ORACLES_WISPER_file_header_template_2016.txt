@@ -1,0 +1,70 @@
+71, 1001
+David Noone
+Oregon State University
+Water Vapor Isotopic Analyzer (Picarro L2120i) - H2O concentration, D/H and 18O/16O isotope ratios (delta notation)
+ORACLES
+1, 1
+2016, 08, 30, 2019, 09, 01
+1
+Start_UTC, seconds
+5
+1, 1, 1, 1, 1
+-9999.0, -9999.0, -9999.0, -9999.0, -9999.0
+h2o_tot2, ppmv,		mixing ratio of total water - measured with 2nd Picarro (see INSTRUMENT_INFO/DATA_INFO sections below).
+dD_tot2, permil, 	total water deuterium/hydrogen ratio, expressed in delta-notation with SMOW reference - measured with 2nd Picarro (see INSTRUMENT_INFO/DATA_INFO sections below).
+std_dD_tot2, permil,	precision in dD_tot2 measurement @ 1Hz.
+d18O_tot2, permil, 	total water oxygen18/16 ratio, expressed in delta-notation with SMOW reference - measured with 2nd Picarro (see INSTRUMENT_INFO/DATA_INFO sections below).
+std_d18O_tot2, permil,	precision in d18O_tot2 measurement @ 1Hz.
+0
+52
+PI_CONTACT_INFO: Address: CEOAS, Oregon State University, Corvallis OR 97331; email: nooned@oregonstate.edu
+PLATFORM: NASA P3B (N426NA), sampling port side foward window from forward facing diffuser inlet and forward facing counterflow virtual impactor inlet.
+LOCATION: Aircraft location data decribed elsewhere.
+ASSOCIATED_DATA: see http://espoarchive.nasa.gov/archive/browse/oracles
+INSTRUMENT_INFO: The WISPER system centers around two Water Vapor Isotopic Analyzers (Picarro L2120-i and L2120-fi) which utilize cavity-ringdown tunable diode laser spectoscopy.
+Air for in-situ sampling was collected through two inlets: one was the isokinetic SDI inlet and the other was the Oregon State University counterflow virtual impactor (CVI) inlet.
+The first analyzer, Pic1, was capable of sampling from either the SDI or CVI inlet, while the second analyzer, Pic2, sampled from only the SDI inlet. For the 2016 deployment, the
+CVI was not present and therefore only Pic2 variables are available.
+DATA_INFO: Variables with subscript 'tot2' (i.e. h2o_tot2, dD_tot2, ...) are Pic2 measurements via the SDI inlet, which are total water measurements (vapor+liquid+ice). Since only Pic2
+was present for the 2016 deployment, only subscript 2 variables are present. Variables with subscript 'tot1' are Pic1 measurements via the SDI inlet, and are total water measurements
+as well. Variables with subcript cld (i.e. h2o_cld, dD_cld, ...) are Pic1 measurements of cloud water only (liquid+ice), via the CVI. 'tot1' and 'cld' variables are present for both
+the 2017 and 2018 deployments. Cloud data where the measured humidity after enchancement is less than 800 ppmv has been masked. However, even at 800 ppmv the isotope ratio measurements are
+not highly precise or acaurate. If better quality is desired, it is recommended to mask data for humidities below 1500 ppmv. See the 'OTHER_COMMENTS' section below for an overview of
+instrument performance and data quality for particular flights. Due to incomplete isotope ratio calibration data, the isotope variables in this dataset should not be compared to other
+datasets on an absolute scale or used for analyses where an absolute scale is necessary. See the section 'UNCERTAINTY' for more info.
+UNCERTAINTY: Precision: Precision: Estimates of isotope ratio precisions are included as standard deviation columns. The precision for humidity is likely negligible for most studies and
+columns are not included - if needed, they can assumed to be 35 ppmv for humidities below 6000 ppmv, and 15 ppmv for higher humidities; Accuracy: Due to incomplete absolute calibration data,
+the isotope variables in this dataset should not be compared to other datasets on an absolute scale or used for analyses where an absolute scale is necessary. However, the dataset is self
+consistent - i.e. relative changes in values within a flight, between separate flights, and between separate years can be taken as real, within uncertainty. For an estimate of these
+uncertainties, please contact the PI (see DM_CONTACT_INFO below), or Dean Henze at henzede@oregonstate.edu. Absolute calibration of the humidity measurements can be assumed, with
+an accuracy of +/-2.5% for values above 6000 ppmv, +/-3.5% for values between 4000 and 6000 ppmv, and +/-5% for values below 4000 ppmv.
+ULOD_FLAG: -7777
+ULOD_VALUE: N/A
+LLOD_FLAG: -8888
+LLOD_VALUE: N/A
+DM_CONTACT_INFO: David Noone: Oregon State University, nooned@oregonstate.edu; or Dean Henze at henzede@oregonstate.edu.
+PROJECT_INFO: ORACLES Mission August-September 2017; Sao Tome and Ascension Island.
+STIPULATIONS_ON_USE: Until made public, only the ORACLES science team is allowed to use this data, per the ORACLES data protocol.
+OTHER_COMMENTS:
+Transit flights:
+All transit flights were almost entirely done at constant a altitude 6-7km above sea level, and are likely not useful for most analyses. No reference data is available to time synchronize
+WISPER data during transit flights. Further, any outlying data have not been removed for these flights. However, a basic calibration of humidity and isotope ratios has been performed. Transit
+flight data is not recommended for scientific research unless the PI or Dean Henze are contacted first.
+Research flights: The following is a list of flights with missing data or outlying data qualtiy. If data from these days stand out in your analysis, caution should be taken:
+09/06/2016 and 09/08/2016: No data available.
+09/24/2016: Pic2 instrument had multiple periods of poor performance during the flight. These segments of bad data have been removed.
+08/12/2017 and 08/13/2017: Pic1 was not operating normally, and the calibration for these days was different from the remaining days. An alternate calibration method was used. Pic1 isotope data
+for humidities below 1000 ppmv should not be used.
+10/02/2018: No data available.
+10/10/2018: CVI data for this flight, including the flow and enhancement data, should not be used.
+The following is a list of flights where the time lag between Pic1 and Pic2 was non-standard:
+09/10/2016: Some segments of data can have up to a 20s lag, although most data is better. If higher accuracy is needed, time synchronization should be performed on individual segments.
+09/24/2016: Some segments of data can have up to a 10s lag, although most data is better. If higher accuracy is needed, time synchronization should be performed on individual segments.
+09/27/2018: Some segments of data can have up to a 15s lag, although most data is better. If higher accuracy is needed, time synchronization should be performed on individual segments.
+All flights between and including 10/12/2018 - 10/23/2018: Flow controller for Pic2 line was off. Some segments of data can have up to a 15s offset, although most data is better. If
+higher accuracy is needed, time synchronization should be performed on individual segments.
+REVISION: R2
+R0: Calibrated and time synchronized dataset with quality control, suitable for scientific research. This is the first revision of the 2016 data with the new 'WISPER' filename, and therefore
+is considered 'R0'.
+R1: Same datafiles as R0 resubmitted to the data repository to make the revision number match those of the 2017 and 2018 sampling periods.
+R2: Same datafiles as R1 resubmitted to the data repository to make the revision number match those of the 2017 and 2018 sampling periods.
