@@ -24,14 +24,15 @@ apply_cal:
 
 q_dep_cal, abs_cal:
     Used by 'apply_cal'. No need to call separately.
-
 """
+
 
 
 # Third party:
 import numpy as np # 1.19.2
 import matplotlib.pyplot as plt # 3.3.2
   
+
 
 ## Parameters for steps (1) and (2) equations in the file header:
 ## -------------------------------
@@ -54,42 +55,7 @@ mq = 0.8512; kq = 0
 ## -------------------------------
 
 
-def q_dep_cal(deltavals, qvals, a, b):
-    """
-    Apply humidity dependence correction for either dD or d18O. Returns 
-    corrected values.
-    
-    deltavals: float or np.array (length N):
-        Either uncalibrated dD or d18O [permil].
 
-    qvals: float or np.array (length N):
-         Uncalibrated humidity [ppmv].
-         
-    a, b: floats:
-        Parameters in the humidity-dependence correction formula.
-    """
-    def qdep_correction(logq, a, b): # Humidity-dependence correction formula.
-        return a*(np.log(50000)-logq)**b
-
-    # Apply correction:
-    correction = qdep_correction(np.log(qvals), a, b)
-    return deltavals - correction
-    
-  
-def abs_cal(x, m, k):
-    """
-    Formula for absolute calibration of water concentration or iso ratios. 
-    Just a line. Returns corrected water conc., dD, d18O, respectively.
-    
-    x: float or np.array:
-        Either humidity [ppmv], dD [permil], or d18O [permil].
-        
-    m, k: floats:
-        Slope and offset.
-    """
-    return m*x + k
-
-    
 def apply_cal(data, date, testplots=False):
     """
     Apply calibrations to a single WISPER file.
@@ -137,6 +103,45 @@ def apply_cal(data, date, testplots=False):
     if testplots: test_plots(data_precal, data, date)
     
     return data
+
+
+
+def q_dep_cal(deltavals, qvals, a, b):
+    """
+    Apply humidity dependence correction for either dD or d18O. Returns 
+    corrected values.
+    
+    deltavals: float or np.array (length N):
+        Either uncalibrated dD or d18O [permil].
+
+    qvals: float or np.array (length N):
+         Uncalibrated humidity [ppmv].
+         
+    a, b: floats:
+        Parameters in the humidity-dependence correction formula.
+    """
+    def qdep_correction(logq, a, b): # Humidity-dependence correction formula.
+        return a*(np.log(50000)-logq)**b
+
+    # Apply correction:
+    correction = qdep_correction(np.log(qvals), a, b)
+    return deltavals - correction
+    
+
+  
+def abs_cal(x, m, k):
+    """
+    Formula for absolute calibration of water concentration or iso ratios. 
+    Just a line. Returns corrected water conc., dD, d18O, respectively.
+    
+    x: float or np.array:
+        Either humidity [ppmv], dD [permil], or d18O [permil].
+        
+    m, k: floats:
+        Slope and offset.
+    """
+    return m*x + k
+
 
 
 def test_plots(precal, postcal, date):

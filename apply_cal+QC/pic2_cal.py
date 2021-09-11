@@ -24,7 +24,10 @@ apply_cal_2016file, apply_cal_20172018file: Called by 'apply_cal()'.
 
 crosscalibrate_h2o, crosscalibrate_dD_d18O: Cross calibration functions 
     called by 'apply_cal_20172018file()'.
+    
+test_plots: Plots to compare data before and after calibration.
 """
+
 
 
 # Third party:
@@ -34,6 +37,7 @@ import matplotlib.pyplot as plt # 3.3.2
 
 # Pic2 calibration fxns for ORACLES 2016 are taken from the pic1_cal script:
 from pic1_cal import q_dep_cal, abs_cal
+
 
 
 def apply_cal(wisperdata, date, testplots=False):
@@ -72,6 +76,7 @@ def apply_cal(wisperdata, date, testplots=False):
         test_plots(wisper_precal, wisperdata, date)
         
     return wisperdata
+
 
 
 def applycal_2016file(wisperdata, pic):
@@ -132,6 +137,7 @@ def applycal_2016file(wisperdata, pic):
     return wisperdata
 
 
+
 def applycal_20172018file(wisperdata, year):
     """
     Calibration of Pic2 water concentration and isotope ratios for a 2017 or 
@@ -147,6 +153,7 @@ def applycal_20172018file(wisperdata, year):
     wisperdata = crosscalibrate_dD_d18O(wisperdata, year)
     wisperdata = crosscalibrate_h2o(wisperdata, year)
     return wisperdata
+
 
 
 def crosscalibrate_h2o(wisperdata, year):
@@ -166,6 +173,7 @@ def crosscalibrate_h2o(wisperdata, year):
     # Return calibrated h2o:
     wisperdata['h2o_tot2'] = slope*wisperdata['h2o_tot2']
     return wisperdata
+
 
 
 def crosscalibrate_dD_d18O(wisperdata, year):
@@ -222,6 +230,7 @@ def crosscalibrate_dD_d18O(wisperdata, year):
     wisperdata['dD_tot2'] = iso_crosscal(df_xcalvars, p_dD_dict)
     wisperdata['d18O_tot2'] = iso_crosscal(df_xcalvars, p_d18O_dict)
     return wisperdata
+
 
     
 def test_plots(precal, postcal, date):
