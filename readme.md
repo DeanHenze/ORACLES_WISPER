@@ -3,8 +3,11 @@ ORACLES (ObseRvations of Aerosols above CLouds and their intEractionS) is a NASA
 
 The ORACLES experiment included aircraft measurements of the heavy water isotope ratios D/H and 18O/16O of atmospheric water vapor and cloud water. Isotope ratio measurements were taken with the Water Isotope System for Precipitation and Entrainment Research (WISPER). 
 
-This project folder upon completion will include python scripts and data files for WISPER data pre-processing, quality control, and post processing. It will also contain calibration data and scripts used for calibration model selection and parameter tuning.
-
-Current status:
+Folder contents
 ---------------
-Includes first draft of some calibration data and scripts.
+
+apply_cal+QC: 
+	Python scripts for quality control and calibration of all ORACLES WIPSER files. Supporting files. A copy of the WISPER raw data files (not on Github).
+
+calibration_modelling:
+	
