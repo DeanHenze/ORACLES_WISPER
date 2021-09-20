@@ -16,7 +16,7 @@ import statsmodels.api as sm
 
 # My modules:
 import pic1_cal # Has Pic1 calibration functions.
-import precision_columns 
+import precisions
 import mc_sampler as mc
 
 

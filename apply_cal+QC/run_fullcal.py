@@ -18,7 +18,7 @@ import numpy as np # 1.19.2
 # My modules:
 import preprocess 
 import time_sync
-import precision_columns as stdcols
+import precisions as stdcols
 import pic1_cal
 import pic2_cal
 
