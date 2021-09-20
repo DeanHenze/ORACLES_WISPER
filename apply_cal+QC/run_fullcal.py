@@ -40,13 +40,11 @@ def calibrate_file(date):
     # Preprocessing:
     pre = preprocess.Preprocessor(date) # Class instance loads the data.
     pre.preprocess_file() # Apply preprocessing.
-    #pre.test_plots()
     data_prepro = pre.preprodata.copy() # Copy to pass on for calibration.
     data_prepro.replace(-9999, np.nan, inplace=True)
 
     # Time synchronization:
     data_cal = time_sync.wisper_tsync(data_prepro, date)
-    #time_sync.test_plot(pre.preprodata, data_syncd, date)
     
     # Add precision columns:
     data_cal = stdcols.add_precision_cols(data_cal, date, test_plot=False)
@@ -54,13 +52,11 @@ def calibrate_file(date):
     # Pic1 calibration (only relevant for 2017 and 2018 sampling periods):
     if year in ['2017','2018']:
         data_cal = pic1_cal.apply_cal(data_cal, date, testplots=False)
-        #data_cal = pic1_cal.apply_cal(data_cal, date, testplots=True)
     else: 
         data_cal = data_cal
         
     # Pic2 calibration:
     data_cal = pic2_cal.apply_cal(data_cal, date, testplots=False)
-    #data_cal = pic2_cal.apply_cal(data_cal, date, testplots=True)
     
     # Decimal rounding:
     if year == '2016':
