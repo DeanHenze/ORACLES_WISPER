@@ -29,8 +29,8 @@ def add_precision_cols(data, date, test_plot=False):
     """
     
     # Calculate Pi2 precisions as functions of log humidity:
-    data['std_dD_tot2'] = dD_precisions_pic2(data['h2o_tot2'])
-    data['std_d18O_tot2'] = d18O_precisions_pic2(data['h2o_tot2'])
+    data['std_dD_tot2'] = dD_precision_pic2(data['h2o_tot2'])
+    data['std_d18O_tot2'] = d18O_precision_pic2(data['h2o_tot2'])
     #data['std_dD_tot2'] = 6*10**6*np.log(data['h2o_tot2'])**-6.69
     #data['std_d18O_tot2'] = 6170*np.log(data['h2o_tot2'])**-4.72
         
@@ -38,8 +38,8 @@ def add_precision_cols(data, date, test_plot=False):
     # For 2017 and 2018, also make precision columns for Pic1:  
     if date[:4] in ['2017','2018']:
         pic1_h2okeys = ['h2o_tot1','h2o_cld']
-        std_D_pic1 = dD_precisions_pic1(data[pic1_h2okeys])
-        std_18O_pic1 = d18O_precisions_pic1(data[pic1_h2okeys])
+        std_D_pic1 = dD_precision_pic1(data[pic1_h2okeys])
+        std_18O_pic1 = d18O_precision_pic1(data[pic1_h2okeys])
         #std_D_pic1 = 9*10**6*np.log(data[pic1_h2okeys])**-6.66 
         #std_18O_pic1 = 451000*np.log(data[pic1_h2okeys])**-6.56 
     # Assign precision data to columns in 'data':
@@ -75,7 +75,7 @@ def add_precision_cols(data, date, test_plot=False):
 
 
 
-def dD_precisions_pic1(q):
+def dD_precision_pic1(q):
     """
     Returns Picarro 1 dD 1Hz precisions (permil) as a function its 
     measured humidity (q, array-like, ppmv).
@@ -84,7 +84,7 @@ def dD_precisions_pic1(q):
 
 
 
-def d18O_precisions_pic1(q):
+def d18O_precision_pic1(q):
     """
     Returns Picarro 1 dD 1Hz precisions (permil) as a function its 
     measured humidity (q, array-like, ppmv).
@@ -93,7 +93,7 @@ def d18O_precisions_pic1(q):
 
 
 
-def dD_precisions_pic2(q):
+def dD_precision_pic2(q):
     """
     Returns Picarro 2 dD 1Hz precisions (permil) as a function its 
     measured humidity (q, array-like, ppmv).
@@ -102,7 +102,7 @@ def dD_precisions_pic2(q):
     
 
 
-def d18O_precisions_pic2(q):
+def d18O_precision_pic2(q):
     """
     Returns Picarro 2 dD 1Hz precisions (permil) as a function its 
     measured humidity (q, array-like, ppmv).

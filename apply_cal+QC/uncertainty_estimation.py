@@ -5,6 +5,10 @@ Created on Mon Jan 11 17:11:38 2021
 @author: Dean
 
 Uncertainty estimation for the WISPER ORACLES measurements.
+
+2016 calibration parameters will be used to get uncertainty estimates. However, 
+the uncertainties derived using the 2016 parameters are assumed to be 
+representative for all ORACLES years.
 """
 
     
@@ -21,13 +25,6 @@ import mc_sampler as mc
 
 
 
-
-
-"""
-2016 calibration parameters will be used to get uncertainty estimates. However, 
-the uncertainties derived using the 2016 parameters are assumed to be 
-representative for all ORACLES years.
-"""
 def pic1_uncertainties():
         
     """
@@ -42,7 +39,7 @@ def pic1_uncertainties():
         
         d_qdep_correct = pic1_cal.q_dep_cal(d, q, 
                                             calparams[0], calparams[1])
-        d_abscal = pic1_cal.abscal(d_qdep_correct, 
+        d_abscal = pic1_cal.abs_cal(d_qdep_correct, 
                                    calparams[2], calparams[3])
         return d_abscal
             
@@ -74,12 +71,12 @@ def pic1_uncertainties():
             
         if sig_inputvars: # Include instrument precisions?
             sig_q = np.zeros(np.shape(q)) # q is precise enough to ignore.
-            sig_dD = cal_formulas.dD_precision(q)
-            results = mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
-                           params, sig_params, 
-                           6000,
-                           sig_inputvars=[sig_dD, sig_q]
-                           )
+            sig_dD = precisions.dD_precision_pic1(q)
+            results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
+                                          params, sig_params, 
+                                          6000,
+                                          sig_inputvars=[sig_dD, sig_q]
+                                          )
         else:
             results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
                                           params, sig_params, 
@@ -127,12 +124,12 @@ def pic1_uncertainties():
             
         if sig_inputvars: # Include instrument precisions?
             sig_q = np.zeros(np.shape(q)) # q is precise enough to ignore.
-            sig_d18O = cal_formulas.d18O_precision(q)
-            results = mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
-                           params, sig_params, 
-                           6000,
-                           sig_inputvars=[sig_d18O, sig_q]
-                           )
+            sig_d18O = precisions.d18O_precision_pic1(q)
+            results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
+                                          params, sig_params, 
+                                          6000,
+                                          sig_inputvars=[sig_d18O, sig_q]
+                                          )
         else:
             results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
                                           params, sig_params, 
@@ -181,9 +178,11 @@ def pic1_uncertainties():
     ##-------------------------------------------------------------------------
     ## Collect expected values for calibration parameters into a list.
         # Load humidity-dependence calibration parameter fits for 2016:
-    relpath_caltable = r'../Calibration_Data/calibration_fits.xlsx' 
-    pars_qdep = pd.read_excel(relpath_caltable, sheet_name='Mako_delta(q)')
-    pars_qdep_16 = pars_qdep.loc[pars_qdep['year']==2016]
+    relpath_qdepcal_pars = (r"../calibration_modelling/humidity_dependence/"
+                            + "qdependence_fit_results.csv")
+    pars_qdep = pd.read_csv(relpath_qdepcal_pars)
+    pars_qdep_16 = pars_qdep.loc[(pars_qdep['picarro']=='Mako')
+                                 & (pars_qdep['year']==2016)]
     pars_qdep_D = pars_qdep_16[['aD','bD']].values[0] 
         # Hard code absolute calibration parameters:
     m_D = 1.0564; k_D = -5.957469671
@@ -346,7 +345,7 @@ def pic1_uncertainties():
     
     
     ## Save calibration parameter fit table to .csv file:
-    sigWISP_df.to_csv(r"../Calibration_Data/uncertainty_params.csv")
+    sigWISP_df.to_csv(r"./uncertainty_params.csv")
             
             
 pic1_uncertainties()
