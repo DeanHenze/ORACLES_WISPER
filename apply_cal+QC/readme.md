@@ -31,9 +31,14 @@ Other files/folders on GitHub
 mc_sampler.py:
 	Monte-Carlo function used for uncertainty estimation.
 
+ORACLES_WISPER_file_header_*.txt:
+	Contains header script to add to the beginning of each calibrated WISPER file. Format is 
+	compatible with NASA ESPO standards.
+
 	
 Other files/folders not on GitHub
 -----------------------------
+
 P3_merge_data/:
 	Includes .nc files of all P3 variables merged for each flight, taken from ESPO. Needed for 
 	time_synchronization. 
@@ -43,7 +48,3 @@ outlier_time_intervals/:
 
 WISPER_raw_data/:
 	Raw WISPER files. One file per flight.
-
-ORACLES_WISPER_file_header_*.txt:
-	Contains header script to add to the beginning of each calibrated WISPER file. Format is 
-	compatible with NASA ESPO standards.
