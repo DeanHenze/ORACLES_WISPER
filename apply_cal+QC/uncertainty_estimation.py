@@ -25,6 +25,97 @@ import mc_sampler as mc
 
 
 
+def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
+    """
+    Compute uncertainties for dD using monte carlo sampling.
+    Plot the results. Then, fit a polynomial to the uncertainties as a fxn of 
+    q and dD.
+    
+    Inputs
+    ------
+    d, q: ND np.arrays, same shape.
+        Values for isotope ratio (either dD or d18O) and humidity.    
+    
+    params: 4-element list/array-like. 
+        First 2 elements are the 'a' and 'b' parameters in the humidity-
+        dependence formula. Second 2 elements are the slope and intercept of 
+        the absolute calibration. 
+    
+    sig_params: 4-element list/array-like; 
+        Uncertainties for 'params', as stdevs.
+    
+    sig_d: None or np.array same shape as q.
+        Default=None. Use to include measurement uncertainties (i.e. 
+        instrument precision) in the total computation of WISPER uncertainties.
+        
+    Returns uncertainties in same shape as q.
+    """    
+    
+    def pic1_isoratio_fullcal(d, q, calparams):
+        """
+        Full calibration of either dD or d18O for Pic1.
+        
+        d, q: np.arrays, same length.
+            Values for isotope ratio (either dD or d18O) and humidity.
+            
+        calparams: As in the header of the encompassing fxn. 
+        """
+        d_qdep_correct = pic1_cal.q_dep_cal(d, q, 
+                                            calparams[0], calparams[1])
+        d_abscal = pic1_cal.abs_cal(d_qdep_correct, 
+                                   calparams[2], calparams[3])
+        return d_abscal
+    
+    
+    ## Monte Carlo iterations with the full cal model:
+    #q, d = np.meshgrid(np.linspace(1500,22000,100), np.linspace(-300,-60,150))
+        
+    if sig_d is not None: # Include instrument precisions.
+        sig_q = np.zeros(np.shape(q)) # q is precise enough to ignore.
+        #sig_dD = precisions.dD_precision_pic1(q)
+        results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
+                                      params, sig_params, 
+                                      6000,
+                                      sig_inputvars=[sig_d, sig_q]
+                                      )
+    else:
+        results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
+                                      params, sig_params, 
+                                      6000,
+                                      )
+
+    return results
+
+
+
+def fit_poly(sig_uncert):
+    """
+    Fit standard deviations to a polynomial function of humidity and isoratio.
+
+    """
+    # Put vars in a pandas df to use with the statsmodel package:
+    df_forfit = pd.DataFrame({'logq':np.log(q.flatten()),
+                              'd':d.flatten(),
+                              'sig_d':results[1].flatten()})
+    
+    # Add columns for powers of q. Add column for constant offset:
+    for p in (2,3,4):
+        df_forfit['logq^'+str(p)] = df_forfit['logq']**p
+        df_forfit['const'] = np.ones(len(df_forfit))
+
+    # Linear regression using statsmodels
+    predictorvars = ['const','logq','logq^2','logq^3','logq^4','d18O']
+    fit = sm.OLS(df_forfit['sig_d18O'], df_forfit[predictorvars], missing='drop').fit()            
+    #print(fit.summary())  
+    #print(fit.params)
+    print(np.round(fit.rsquared, decimals=2))
+            
+    return fit.params 
+
+
+
+
+
 def pic1_uncertainties():
         
     """
@@ -35,18 +126,18 @@ def pic1_uncertainties():
             'b' parameters in the humidity dependence formula. Second 2 elements 
             are the slope and intercept of the absolute calibration.
     """
-    def pic1_isoratio_fullcal(d, q, calparams):
-        
-        d_qdep_correct = pic1_cal.q_dep_cal(d, q, 
-                                            calparams[0], calparams[1])
-        d_abscal = pic1_cal.abs_cal(d_qdep_correct, 
-                                   calparams[2], calparams[3])
-        return d_abscal
+    #def pic1_isoratio_fullcal(d, q, calparams):
+    #    
+    #    d_qdep_correct = pic1_cal.q_dep_cal(d, q, 
+    #                                        calparams[0], calparams[1])
+    #    d_abscal = pic1_cal.abs_cal(d_qdep_correct, 
+    #                               calparams[2], calparams[3])
+    #    return d_abscal
             
      
     """
     Following two functions compute uncertainties for dD and d18O 
-    respectively. The results are plotted. Then, a polynomial to the 
+    respectively. The results are plotted. Then, a polynomial is fit to the 
     uncertainties as a fxn of q and the respective isotope ratio.
     
     params: 4-element list/array-like. First 2 elements are the 'a' and 
