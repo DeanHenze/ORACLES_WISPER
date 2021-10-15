@@ -25,7 +25,7 @@ import mc_sampler as mc
 
 
 
-def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
+def isoratio_uncertainties_MC(d, q, calparams, sig_calparams, sig_d=None):
     """
     Compute uncertainties for dD using monte carlo sampling.
     Plot the results. Then, fit a polynomial to the uncertainties as a fxn of 
@@ -36,12 +36,12 @@ def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
     d, q: ND np.arrays, same shape.
         Values for isotope ratio (either dD or d18O) and humidity.    
     
-    params: 4-element list/array-like. 
+    calparams: 4-element list/array-like. 
         First 2 elements are the 'a' and 'b' parameters in the humidity-
         dependence formula. Second 2 elements are the slope and intercept of 
         the absolute calibration. 
     
-    sig_params: 4-element list/array-like; 
+    sig_calparams: 4-element list/array-like; 
         Uncertainties for 'params', as stdevs.
     
     sig_d: None or np.array same shape as q.
@@ -55,10 +55,8 @@ def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
         """
         Full calibration of either dD or d18O for Pic1.
         
-        d, q: np.arrays, same length.
-            Values for isotope ratio (either dD or d18O) and humidity.
-            
-        calparams: As in the header of the encompassing fxn. 
+        d, q, calparams: 
+            As in the header of the encompassing fxn. 
         """
         d_qdep_correct = pic1_cal.q_dep_cal(d, q, 
                                             calparams[0], calparams[1])
@@ -74,13 +72,13 @@ def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
         sig_q = np.zeros(np.shape(q)) # q is precise enough to ignore.
         #sig_dD = precisions.dD_precision_pic1(q)
         results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
-                                      params, sig_params, 
+                                      calparams, sig_calparams, 
                                       6000,
                                       sig_inputvars=[sig_d, sig_q]
                                       )
     else:
         results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
-                                      params, sig_params, 
+                                      calparams, sig_calparams, 
                                       6000,
                                       )
 
@@ -88,15 +86,19 @@ def isoratio_uncertainties_MC(d, q, params, sig_params, sig_d=None):
 
 
 
-def fit_poly(sig_uncert):
+def fit_poly(q, d, sig_uncert):
     """
     Fit standard deviations to a polynomial function of humidity and isoratio.
+    
+    df_forfit = pd.DataFrame({'logq':np.log(q.flatten()),
+                                  'dD':d.flatten(),
+                                  'sig_dD':results[1].flatten()})
 
     """
     # Put vars in a pandas df to use with the statsmodel package:
-    df_forfit = pd.DataFrame({'logq':np.log(q.flatten()),
-                              'd':d.flatten(),
-                              'sig_d':results[1].flatten()})
+    df_forfit = pd.DataFrame({'logq':np.log(q),
+                              'd':d,
+                              'sig_d':sig_uncert})
     
     # Add columns for powers of q. Add column for constant offset:
     for p in (2,3,4):
@@ -105,7 +107,7 @@ def fit_poly(sig_uncert):
 
     # Linear regression using statsmodels
     predictorvars = ['const','logq','logq^2','logq^3','logq^4','d18O']
-    fit = sm.OLS(df_forfit['sig_d18O'], df_forfit[predictorvars], missing='drop').fit()            
+    fit = sm.OLS(df_forfit['sig_d'], df_forfit[predictorvars], missing='drop').fit()            
     #print(fit.summary())  
     #print(fit.params)
     print(np.round(fit.rsquared, decimals=2))
@@ -114,7 +116,122 @@ def fit_poly(sig_uncert):
 
 
 
+def get_calparams(iso, sig_absoffset):
+    """
+    Returns means and standard deviations for all parameters in the 
+    isotope ratio calibration formulas.
+    
+    iso: str.
+        Either 'D' or '18O' for isotopologue.
+    """
+    
+    ## Means:
+        # Load humidity-dependence cal param data for 2016:
+    pars_qdep = pd.read_csv(r"../calibration_modelling/humidity_dependence/"
+                            + "qdependence_fit_results.csv")
+    pars_qdep_16 = pars_qdep.loc[(pars_qdep['picarro']=='Mako')
+                                 & (pars_qdep['year']==2016)]
+    pars_qdep = pars_qdep_16[['a'+iso,'b'+iso]].values[0] 
+        # Hard code abs cal parameters:
+    if iso=='D':
+        m = 1.0564; k = -5.957469671 
+    if iso=='18O':
+        m = 1.051851852; k = -1.041851852
+        # Combine into a single list:
+    pars = np.append(pars_qdep, [m, k])
 
+
+    ## Standard deviations:
+        # For humidity dependence params:
+    sigpars_qdep = pars_qdep_16[['sig_aD','sig_bD']].values[0] 
+        # For abs cal params:
+    if iso=='D':
+        sigm = 0.0564/2; sigk = sig_absoffset
+    if iso=='18O':
+        sigm = 0.05185/2; sigk = sig_absoffset
+        # Combine into a single list:
+    sigpars = np.append(sigpars_qdep, [sigm, sigk])         
+        
+    
+    return pars, sigpars
+           
+    
+
+def get_isoprecisions(iso, q):
+    """
+    iso: str.
+        Either 'D' or '18O' for isotopologue.
+        
+    q: ND np.array.
+        Humidities, used to compute precicions.
+    """
+    if iso=='D':
+        return precisions.dD_precision_pic1(q)
+    if iso=='18O':    
+        return precisions.d18O_precision_pic1(q)
+    
+
+
+def get_uncertainties_with_fit():
+    """
+    Currently for dD only.
+    """
+    
+    q, d = np.meshgrid(np.linspace(1500,22000,100), np.linspace(-300,-60,150))
+
+    # (2) Uncertainties when averaging data to 0.1Hz or lower, or 
+    # comparing PDFs:
+        # Calibration pars expected values and standard deviations:
+    std_absoffset = 1
+    calparams = get_calparams('D', std_absoffset)
+    isoratio_uncertainties_MC(d, q, calparams[0], calparams[1], sig_d=None)
+
+
+#-------------------
+    """    
+## dD 
+       # (1) Uncertainties when using the 1Hz WISPER measurements for 
+        # relative comparisons:    
+    sigpars_qdep_D = pars_qdep_16[['sig_aD','sig_bD']].values[0] 
+    sig_mD = 0.0564/2; sig_kD = 1 # No offset needed for relative comparisons.
+    sigpars_all_D = np.append(sigpars_qdep_D, [sig_mD,sig_kD])
+    sigWISP1_D = sigma_with_fit_dD(pars_all_D, sigpars_all_D, sig_inputvars=True)
+    
+        # (2) Uncertainties when averaging data to 0.1Hz or lower, or 
+        # comparing PDFs:
+    sigWISP2_D = sigma_with_fit_dD(pars_all_D, sigpars_all_D)
+    
+        # (3) Uncertainties when comparing WISPER 0.1Hz data or PDFs to other 
+        # datasets, or to absolute theoretical values:
+    sig_kD = 4. # Now we care about absolute offset.
+    sigpars_all_D = np.append(sigpars_qdep_D, [sig_mD,sig_kD])
+    sigWISP3_D = sigma_with_fit_dD(pars_all_D, sigpars_all_D, 
+                                   ax_cax=(ax_sigD, cax_sigD))
+
+    ## d18O:
+        # (1) Uncertainties when using the 1Hz WISPER measurements for 
+        # relative comparisons:
+    sigpars_qdep_18O = pars_qdep_16[['sig_a18O','sig_b18O']].values[0] 
+    sig_m18O = 0.05185/2; sig_k18O = 1./2 # Offset needed for d18O due to drift.
+    sigpars_all_18O = np.append(sigpars_qdep_18O, [sig_m18O,sig_k18O])
+    sigWISP1_18O = sigma_with_fit_d18O(pars_all_18O, sigpars_all_18O, 
+                                       sig_inputvars=True)
+    
+        # (2) Uncertainties when averaging data to 0.1Hz or lower, or 
+        # comparing PDFs:
+    sigWISP2_18O = sigma_with_fit_d18O(pars_all_18O, sigpars_all_18O)
+
+        # (3) Uncertainties when comparing WISPER 0.1Hz data or PDFs to other 
+        # datasets, or to absolute theoretical values:
+    sig_k18O = 1. # Now we care about absolute offset.
+    sigpars_all_18O = np.append(sigpars_qdep_18O, [sig_m18O,sig_k18O])
+    sigWISP3_18O = sigma_with_fit_d18O(pars_all_18O, sigpars_all_18O, 
+                                       ax_cax=(ax_sig18O, cax_sig18O))
+    
+    """
+    
+    
+    
 
 def pic1_uncertainties():
         
