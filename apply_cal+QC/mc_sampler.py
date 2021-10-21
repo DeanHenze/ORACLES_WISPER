@@ -18,7 +18,8 @@ import numpy as np
 
 
 def mc_normalsampler(model, inputvars, param_means, sig_params, 
-                     iterations, unpack_params=False, sig_inputvars=None):
+                     iterations, unpack_params=False, sig_inputvars=None, 
+                     return_agg=False):
     """
     Inputs:
         model (function, callable): The model to run monte carlo with. The model 
@@ -49,6 +50,11 @@ def mc_normalsampler(model, inputvars, param_means, sig_params,
         sig_inputvars (optional array-like): Standard uncertainties in input vars 
             (e.g. measurement uncertainty). If passed, should be same shape as 
             inputvars.
+            
+        return_agg: bool.
+            (default=False) If True, return only mean and standard deviation 
+            of model run output at each input value (rather than output of 
+            every MC iteration).
     """
     
     # Make sure some things are definitey np.arrays:
@@ -93,4 +99,7 @@ def mc_normalsampler(model, inputvars, param_means, sig_params,
     modelmean = np.mean(modout, axis=0)
     modelstd = np.std(modout, axis=0)
     
-    return np.array([modelmean, modelstd, modout], dtype=object)
+    if return_agg:
+        return np.array([modelmean, modelstd])
+    else:
+        return np.array([modelmean, modelstd]), modout

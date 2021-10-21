@@ -25,7 +25,7 @@ import mc_sampler as mc
 
 
 
-def isoratio_uncertainties_MC(d, q, calparams, sig_calparams, sig_d=None):
+def wisper_uncertainties_MC(d, q, calparams, sig_calparams, sig_d=None):
     """
     Compute uncertainties for dD using monte carlo sampling.
     Plot the results. Then, fit a polynomial to the uncertainties as a fxn of 
@@ -74,19 +74,20 @@ def isoratio_uncertainties_MC(d, q, calparams, sig_calparams, sig_d=None):
         results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
                                       calparams, sig_calparams, 
                                       6000,
-                                      sig_inputvars=[sig_d, sig_q]
+                                      sig_inputvars=[sig_d, sig_q], 
+                                      return_agg=True
                                       )
     else:
         results = mc.mc_normalsampler(pic1_isoratio_fullcal, [d,q], 
                                       calparams, sig_calparams, 
-                                      6000,
+                                      6000, return_agg=True
                                       )
 
     return results
 
 
 
-def fit_poly(q, d, sig_uncert):
+def fit_poly(q, d, sig_d):
     """
     Fit standard deviations to a polynomial function of humidity and isoratio.
     
@@ -98,7 +99,7 @@ def fit_poly(q, d, sig_uncert):
     # Put vars in a pandas df to use with the statsmodel package:
     df_forfit = pd.DataFrame({'logq':np.log(q),
                               'd':d,
-                              'sig_d':sig_uncert})
+                              'sig_d':sig_d})
     
     # Add columns for powers of q. Add column for constant offset:
     for p in (2,3,4):
@@ -106,7 +107,7 @@ def fit_poly(q, d, sig_uncert):
         df_forfit['const'] = np.ones(len(df_forfit))
 
     # Linear regression using statsmodels
-    predictorvars = ['const','logq','logq^2','logq^3','logq^4','d18O']
+    predictorvars = ['const','logq','logq^2','logq^3','logq^4','d']
     fit = sm.OLS(df_forfit['sig_d'], df_forfit[predictorvars], missing='drop').fit()            
     #print(fit.summary())  
     #print(fit.params)
@@ -169,10 +170,26 @@ def get_isoprecisions(iso, q):
         return precisions.dD_precision_pic1(q)
     if iso=='18O':    
         return precisions.d18O_precision_pic1(q)
+
+
+            
+def wisper_sig_formula(q, d, pars):
+    """
+    Formula for either dD or d18O uncertainties as a function of q and the 
+    respective isotope ratio (see also 'fit_poly').
     
+    q, d: ND np.array's, same size.
+        Values for humidity and one of dD or d18O.
+        
+    pars: array-like, length=6.
+        Parameters in the fit formula.
+    """
+    return pars[0] + pars[1]*np.log(q) + pars[2]*np.log(q)**2 + \
+        pars[3]*np.log(q)**3 + pars[4]*np.log(q)**4 + pars[5]*d    
 
 
-def get_uncertainties_with_fit():
+
+def wisper_uncertainties_with_fit():
     """
     Currently for dD only.
     """
@@ -184,8 +201,20 @@ def get_uncertainties_with_fit():
         # Calibration pars expected values and standard deviations:
     std_absoffset = 1
     calparams = get_calparams('D', std_absoffset)
-    isoratio_uncertainties_MC(d, q, calparams[0], calparams[1], sig_d=None)
+    sigWISP2_D = wisper_uncertainties_MC(d, q, calparams[0], calparams[1], sig_d=None)[1]
 
+
+    ## Plot of Monte Carlo standard devs:  
+    p = plt.scatter(q, d, c=sigWISP2_D, cmap='gist_ncar', vmin=2, vmax=10)
+    plt.colorbar()
+    
+    ## Get polynomial fit:
+    parsD_fit2 = fit_poly(q.flatten(), d.flatten(), sigWISP2_D.flatten())
+               
+    plt.figure()
+    p1 = plt.scatter(q, d, c=wisper_sig_formula(q, d, parsD_fit2.values), 
+                     cmap='gist_ncar', vmin=2, vmax= 10)
+    plt.colorbar()
 
 #-------------------
     """    
@@ -556,4 +585,4 @@ def pic1_uncertainties():
     sigWISP_df.to_csv(r"./uncertainty_params.csv")
             
             
-pic1_uncertainties()
+#pic1_uncertainties()
