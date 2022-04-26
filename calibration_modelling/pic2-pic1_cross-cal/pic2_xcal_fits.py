@@ -221,7 +221,117 @@ def model_residual_map(iso, wisperdata, pars, logq_grid, iso_grid, ffact=1):
     res = abs(modelresults - wisperdata[iso+'_tot1'])
     # Get RMSE 2d map using oversampling:
     return oversampler.oversampler(res, logq, wisperdata[iso+'_tot2'], 
-                                   logq_grid, iso_grid, ffact=ffact)          
+                                   logq_grid, iso_grid, ffact=ffact)
+
+
+def plot_residual_maps(year, wisperdata, pars_dD, pars_d18O):
+    """
+    Publication-ready figure of residuals from cross-calibration.
+    """          
+    fig = plt.figure(figsize=(6.5,2.5))
+    ax_D = plt.axes([0.125,0.2,0.29,0.75])
+    cbax_D = plt.axes([0.435,0.2,0.02,0.625])
+    ax_18O = plt.axes([0.62,0.2,0.29,0.75])
+    cbax_18O = plt.axes([0.93,0.2,0.02,0.625])    
+
+
+    # Predictor variable values to pass into model:
+    if year=='2017':
+        logq = np.linspace(np.log(100), np.log(30000), 200)
+        logq_grid, dD_grid = np.meshgrid(logq, np.linspace(-450, -30, 100))
+        logq_grid, d18O_grid = np.meshgrid(logq, np.linspace(-55, 0, 100))
+    if year=='2018':
+        logq = np.linspace(np.log(2000), np.log(30000), 200)
+        logq_grid, dD_grid = np.meshgrid(logq, np.linspace(-200, -30, 100))
+        logq_grid, d18O_grid = np.meshgrid(logq, np.linspace(-55, -30, 100))
+    
+    
+    # Compute calibrated pic2:
+    wisperdata.loc[wisperdata['h2o_tot1']<2000] = np.nan
+    wisperdata = wisperdata.iloc[120:-120]
+    wisperdata = wisperdata.rolling(window=10).mean()
+    def predictor_vars(iso, wisperdata):
+        logq = np.log(wisperdata['h2o_tot2'].values)
+        predictorvars = {'logq':logq, 
+                         iso:wisperdata[iso+'_tot2'].values, 
+                         'logq*'+iso:logq*wisperdata[iso+'_tot2'].values, 
+                         }
+        return predictorvars
+    wisperdata['pic2cal_dD'] = model_isoxcal(predictor_vars('dD', wisperdata), pars_dD)
+    wisperdata['pic2cal_d18O'] = model_isoxcal(predictor_vars('d18O', wisperdata), pars_d18O)
+    
+    
+    # Pivot tables of residuals:
+    wisperdata['logq1'] = np.log(wisperdata['h2o_tot1'].values)
+    wisperdata['xcal_res2_dD'] = (wisperdata['dD_tot1'] - wisperdata['pic2cal_dD'])**2
+    wisperdata['xcal_res2_d18O'] = (wisperdata['d18O_tot1'] - wisperdata['pic2cal_d18O'])**2
+        # Quick print out of RMSE before and afte calibration:
+    rmse = lambda a,b: np.nanmean((a - b)**2)**0.5
+    print("dD RMSE before cal = %0.2f" % rmse(wisperdata['dD_tot1'], wisperdata['dD_tot2']))
+    print("dD RMSE after cal = %0.2f" % rmse(wisperdata['dD_tot1'], wisperdata['pic2cal_dD']))
+    print("d18O RMSE before cal = %0.2f" % rmse(wisperdata['d18O_tot1'], wisperdata['d18O_tot2']))
+    print("d18O RMSE after cal = %0.2f" % rmse(wisperdata['d18O_tot1'], wisperdata['pic2cal_d18O']))
+    
+    def root_mean(x):
+        if len(x)<120:
+            return np.nan
+        else:
+            return np.nanmean(x)**0.5
+    
+    wisperdata['logq1_binned'] = np.round(wisperdata['logq1']/0.2)*0.2
+    wisperdata['dDtot1_binned'] = np.round(wisperdata['dD_tot1']/20)*20
+    wisperdata['d18Otot1_binned'] = np.round(wisperdata['d18O_tot1']/2)*2
+    restable_dD = pd.pivot_table(wisperdata, values='xcal_res2_dD', index='dDtot1_binned', 
+                                 columns='logq1_binned', aggfunc=root_mean)
+    restable_d18O = pd.pivot_table(wisperdata, values='xcal_res2_d18O', index='d18Otot1_binned', 
+                                 columns='logq1_binned', aggfunc=root_mean)
+    #counttable_dD = pd.pivot_table(wisperdata, values='xcal_res2_dD', index='dDtot1_binned', 
+    #                               columns='logq1_binned', aggfunc='count')
+    #counttable_dD.loc[counttable_dD.values > 100]
+    
+    if year=='2017':
+        vmax_D = 12; vmax_18O = 4
+    if year=='2018':
+        vmax_D = 6; vmax_18O = 1
+    pcolor_D = ax_D.pcolor(restable_dD.columns.values, 
+                           restable_dD.index.values, 
+                           restable_dD.values, 
+                           vmin=0, vmax=vmax_D)
+    fig.colorbar(pcolor_D, cax=cbax_D)    
+    pcolor_18O = ax_18O.pcolor(restable_d18O.columns.values, 
+                           restable_d18O.index.values, 
+                           restable_d18O.values, 
+                           vmin=0, vmax=vmax_18O)
+    fig.colorbar(pcolor_18O, cax=cbax_18O) 
+    
+
+    ## Figure axes labels, limits, colobars, ...
+    ##-------------------------------------------------------------------------
+        # Results axes mods:
+    if year=='2017':
+        ax_D.set_xlim(7.5, 10.25); ax_D.set_ylim(-230, -40)
+        ax_18O.set_xlim(7.5, 10.25); ax_18O.set_ylim(-30, -2)
+    if year=='2018':
+        ax_D.set_xlim(8.75, 10.25); ax_D.set_ylim(-135, -40)
+        ax_18O.set_xlim(8.75, 10.25); ax_18O.set_ylim(-18, -7.5)
+
+    ax_D.set_xlabel(r'log($q_1$[ppmv])', fontsize=12)
+    ax_D.set_ylabel(r'$\delta D_1$'+u'(\u2030)', fontsize=12, labelpad=0)
+    ax_18O.set_xlabel(r'log($q_1$[ppmv])', fontsize=12)
+    ax_18O.set_ylabel(r'$\delta^{18} O_1$'+u'(\u2030)', fontsize=12, labelpad=0)   
+    
+    
+    cbax_D.set_title(r'$RMS_D$'+'\n'+u'(\u2030)', fontsize=10)
+    plt.setp(cbax_D.yaxis.get_majorticklabels(), 
+             ha="center", va="center", rotation=-90, rotation_mode="anchor")
+    
+    cbax_18O.set_title(r'$RMS_{18O}$'+'\n'+u'(\u2030)', fontsize=10)
+    plt.setp(cbax_18O.yaxis.get_majorticklabels(), 
+         ha="center", va="center", rotation=-90, rotation_mode="anchor")
+    ##------------------------------------------------------------------------- 
+    
+    fig.savefig("pic2_isoratio_xcal_rms_%s.png" % year)
+
         
     
 def draw_fitfig(year, wisperdata, pars_dD, pars_d18O):
@@ -403,7 +513,8 @@ def get_fits_singleyear(year, wisperdata):
 
     ## Draw figures and return parameter fits:
     ##-----------------
-    draw_fitfig(year, wisperdata, model_dD.params, model_d18O.params)
+    #draw_fitfig(year, wisperdata, model_dD.params, model_d18O.params)
+    plot_residual_maps(year, wisperdata, model_dD.params, model_d18O.params)
     return {'q':model_q.params, 'dD':model_dD.params, 'd18O':model_d18O.params}
 
 
@@ -438,7 +549,7 @@ def get_fits():
     fitparams_2018 = get_fits_singleyear('2018', get_wisperdata('2018'))
     
     
-    ## Save H2O xcal fit results to this folder:
+    ## Save H2O xcal fit results to working folder:
     ##-----------------
     slope2017 = fitparams_2017['q']['h2o_tot2']
     slope2018 = fitparams_2018['q']['h2o_tot2']
@@ -448,7 +559,7 @@ def get_fits():
     h2o_xcal_df.to_csv("h2o_xcal_results.csv", index=False)
     
 
-    ## Save H2O xcal fit results to this folder:
+    ## Save H2O xcal fit results to working folder:
     ##-----------------
     def isoratio_xcal_to_csv(fitparams_s, fname):
         # fitparams_s: fit results as pd.Series.
@@ -463,5 +574,5 @@ def get_fits():
     isoratio_xcal_to_csv(fitparams_2018['d18O'], "d18O_xcal_results_2018.csv")
 
 
-if __name__ == '__main__':
-    get_fits()
+#if __name__ == '__main__':
+#    get_fits()
