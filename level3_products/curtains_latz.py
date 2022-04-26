@@ -18,11 +18,10 @@ import sys
 import numpy as np
 import pandas as pd
 import xarray as xr
+import netCDF4 as nc # 1.3.1
 
 # My modules:
-if r'../..' not in sys.path: sys.path.insert(0,r'../..')
-from my_python_modules import oracles_data_loader as odl
-from my_python_modules import math_henze as hmath
+import oversampler
 
 
 
@@ -207,9 +206,9 @@ def compute_curtains(
         h2o_weights=False
         ):
     """
-    Returns latitude-altitude curtains for H2O, dD, d18O, and CO. Curtains are 
-    computed by oversampling. Data is passed as a pandas df and oversampled map 
-    is computed at the passed grid_lat and height (1d arrays)
+    Returns latitude-altitude curtains. Curtains are computed by oversampling. 
+    Data is passed as a pandas df and oversampled map is computed at the 
+    passed grid_lat and height (1d arrays)
     
     Inputs:
         data: pandas df
@@ -222,16 +221,18 @@ def compute_curtains(
     for v in curtvars:
 
         if (v in ['dD_permil','d18O_permil','dxs']) and h2o_weights:
-            curtains[v] = \
-                hmath.oversampler(data[v], data['lat'], data['height_m'], 
-                                  grid_lat, grid_alt, w_add=data['h2o_gkg'], 
-                                  return_stdev='yes', ffact = 0.8)
+            curtains[v] = oversampler.oversampler(
+                data[v], data['lat'], data['height_m'], 
+                grid_lat, grid_alt, w_add=data['h2o_gkg'], 
+                return_stdev='yes', ffact = 0.8
+                )
 
         else:
-            curtains[v] = \
-                hmath.oversampler(data[v], data['lat'], data['height_m'], 
-                                  grid_lat, grid_alt, return_stdev='yes', 
-                                  ffact = 0.8)
+            curtains[v] = oversampler.oversampler(
+                data[v], data['lat'], data['height_m'], 
+                grid_lat, grid_alt, return_stdev='yes', 
+                ffact = 0.8
+                )
             
     return curtains
 
@@ -243,20 +244,47 @@ def get_data(year, block_secs=None, morethanx_gkg=0.2):
     Adds dxs.
     
     Inputs:
-        year (str): 'yyyymmdd'.
+        year (str): 'yyyy'.
         block_secs (int): An optional number of seconds to group/average the data 
             by before oversampling - this reduces computational req's. 
         morethanx_gkg: float, default = 0.2. Keep only data where humidity is 
             greater than the passed value in g/kg.
     """
     
+    relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
+    wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
+    relpath_merged = r"../apply_cal+QC/P3_merge_data/"
+    merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
+    
+    
     vars2get = ['time_secUTC','lat','lon','height_m','h2o_gkg','dD_permil',
                 'd18O_permil','CO_ppbv','T_K','RH','King_LWC_ad','P_hPa']
     
     data = pd.DataFrame({}, columns=vars2get) # Will hold all data.
-    dates = odl.p3_flightdates(year)
+    dates = p3_flightdates(year)
+    
+    
     # Load and append 1 Hz data for each flight:
     for date in dates:
+        
+        wispertemp = pd.read_csv(
+            relpath_wisper + "WISPER_P3_%s_R2.ict" % date, 
+            header=wisper_headerline
+            )
+        
+        # Load merged files as nc.Dataset object but place a subset of the 
+        # vars in a pandas df:
+        mergedtemp_nc = nc.Dataset(
+            relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
+            )
+        mergedtemp_pd = pd.DataFrame({
+            'Start_UTC':mergedtemp_nc.variables['Start_UTC'][:],
+            'height_m':mergedtemp_nc.variables['GPS_Altitude'][:],
+            'lat':mergedtemp_nc.variables['Latitude'][:],
+            'lon':mergedtemp_nc.variables['Longitude'][:],
+            })
+        
+        
         data_temp = odl.oracles_p3_merge_subset(date, with_updated_cal=True)
         data = data.append(data_temp[vars2get], ignore_index=True, sort=False)
         
@@ -277,9 +305,32 @@ def get_data(year, block_secs=None, morethanx_gkg=0.2):
     return data
 
 
+
+def p3_flightdates(year):
+    """
+    Returns P-3 flight dates to use for curtains. Returns as list of str's. 
+    """
+    if year=='2016':
+        return ['20160831','20160902','20160904',
+                '20160910','20160912','20160914',
+                '20160918','20160920','20160925'
+                ]
+    
+    elif year=='2017':
+        return ['20170815','20170817','20170818',
+                '20170821','20170824','20170826',
+                '20170828','20170830','20170831',
+                '20170902']
+
+    elif year=='2018':
+        return ['20180927','20180930','20181003','20181007',
+                '20181010','20181012','20181015','20181017',
+                '20181019','20181021','20181023']
+
+
         
-if __name__=='__main__': 
-    lev3product_allyears()
+#if __name__=='__main__': 
+#    lev3product_allyears()
 
 
 
