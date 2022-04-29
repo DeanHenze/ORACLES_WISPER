@@ -19,9 +19,18 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import netCDF4 as nc # 1.3.1
+from warnings import filterwarnings
 
 # My modules:
 import oversampler
+
+
+
+## Suppress a harmless warning triggered in this script:
+filterwarnings(
+    action='ignore', category=DeprecationWarning, 
+    message='`np.bool` is a deprecated alias'
+    )
 
 
 
@@ -33,7 +42,7 @@ def lev3product_allyears():
     """
     for year in ['2016','2017','2018']:
         lev3curtains = lev3_product(year)
-        path_save = r"../output/wisper_oracles_curtains_%s.nc" % year
+        path_save = r"./wisper_oracles_curtains_%s.nc" % year
         lev3curtains.to_netcdf(path_save, format="NETCDF4")
         
     print("Complete.")
@@ -58,14 +67,14 @@ def lev3_product(year):
     print('Creating Level 3 data product for ORACLES %s.' % year)
 
 
-    ## Gridpoint latitudes, altitudes to include dataset:        
+    ## Gridpoint latitudes, altitudes to include in dataset:        
     dalt_grid = 100 # grid altitude spacing, meters.
     dlat_grid = 0.2 # grid latitude spacing, degrees.
     alt_grid = np.arange(0, 7000 + dalt_grid, dalt_grid)
     lat_grid = np.arange(-24, 1 + dlat_grid, dlat_grid)
     
     
-    ## Create xarray Dataset object with empty entries over all lats, alts 
+    ## Create xarray Dataset object with empty entries over all lats & alts 
     ## for each variable:
     coords_ds = ['alt', 'lat']
     varnames_ds = ['q', 'dD', 'd18O', 'dxs', 'sig_q', 
@@ -75,7 +84,6 @@ def lev3_product(year):
     empty_grid = -9999.*np.ones([len(alt_grid), len(lat_grid)])
     empty_dsvars = [(coords_ds, empty_grid.copy()) for v in varnames_ds]
             
-    print("Computing curtains via oversampling.")
     curtains_ds = xr.Dataset(
         data_vars = dict(zip(varnames_ds, empty_dsvars)),
         coords = dict(lat = lat_grid, alt = alt_grid), 
@@ -217,6 +225,8 @@ def compute_curtains(
             weighting factors when computing the oversampled dD and d18O maps.
     """
 
+    print("Computing curtains via oversampling.")
+
     curtains = {} # Put curtain means here.
     for v in curtvars:
 
@@ -238,69 +248,107 @@ def compute_curtains(
 
 
 
-def get_data(year, block_secs=None, morethanx_gkg=0.2):
+def get_data(year, block_secs=30, morethanx_gkg=0.2):
     """
-    Returns all data for a subset of P3 variables for the passed ORACLES year (str). 
-    Adds dxs.
+    Returns all P-3 data for the passed ORACLES year (str). Returns the 
+    following variables:
+        time, latitude, longitude, altitude, h2o (g/kg), dD (permil), 
+        d18O (permil), dxs (permil).
     
     Inputs:
-        year (str): 'yyyy'.
-        block_secs (int): An optional number of seconds to group/average the data 
-            by before oversampling - this reduces computational req's. 
-        morethanx_gkg: float, default = 0.2. Keep only data where humidity is 
-            greater than the passed value in g/kg.
+    -------
+    year: str
+        'yyyy'.
+    block_secs: int or None
+        Default=30. Time in seconds to group/average the data. Pass None to 
+        keep original 1Hz data.
+    morethanx_gkg: float
+        Default = 0.2. Keep only data where humidity is greater than the 
+        passed value in g/kg.
     """
     
+    pd.options.mode.chained_assignment = None  # Suppress false warning.
+    
+    
+    print("Retrieving data.")
+    
+    
+    # Some info necessary to load the datasets:
     relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
     wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
     relpath_merged = r"../apply_cal+QC/P3_merge_data/"
     merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
     
     
-    vars2get = ['time_secUTC','lat','lon','height_m','h2o_gkg','dD_permil',
-                'd18O_permil','CO_ppbv','T_K','RH','King_LWC_ad','P_hPa']
-    
-    data = pd.DataFrame({}, columns=vars2get) # Will hold all data.
+    # Load and append data for each flight:
+    data = pd.DataFrame({}) # Will hold all data.
     dates = p3_flightdates(year)
     
-    
-    # Load and append 1 Hz data for each flight:
     for date in dates:
         
-        wispertemp = pd.read_csv(
+        # Load wisper data. Get a single column for each variable filled with 
+        # Pic1 instrument data where available and Pic2 otherwise:
+        wisper = pd.read_csv(
             relpath_wisper + "WISPER_P3_%s_R2.ict" % date, 
             header=wisper_headerline
             )
+
+        if year == '2016': # Only Pic2 data available.
+            wisper_updated = wisper[['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']]
+            wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
+ 
+        elif year in ['2017','2018']: # Pic1 and Pic2 data available.
+            wisper_updated = wisper[['Start_UTC','h2o_tot1','dD_tot1','d18O_tot1']] # Pic1 values.
+            for k in wisper_updated.columns[1:]:
+                k2 = k[:-1]+'2'
+                inan = wisper_updated[k].isnull() # Where Pic1 has NAN
+                wisper_updated.loc[inan, k] = wisper.loc[inan, k2].copy() # Replace with Pic2.
+            
+            wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
+           
         
-        # Load merged files as nc.Dataset object but place a subset of the 
+        # Load merged files as nc.Dataset object and place a subset of the 
         # vars in a pandas df:
-        mergedtemp_nc = nc.Dataset(
+        merged_nc = nc.Dataset(
             relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
             )
-        mergedtemp_pd = pd.DataFrame({
-            'Start_UTC':mergedtemp_nc.variables['Start_UTC'][:],
-            'height_m':mergedtemp_nc.variables['GPS_Altitude'][:],
-            'lat':mergedtemp_nc.variables['Latitude'][:],
-            'lon':mergedtemp_nc.variables['Longitude'][:],
+        if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
+        if year == '2018': altitude_key='GPS_Altitude'
+        merged_pd = pd.DataFrame({ # Data to use in curtains.
+            'Start_UTC':merged_nc.variables['Start_UTC'][:],
+            'height_m':merged_nc.variables[altitude_key][:],
+            'lat':merged_nc.variables['Latitude'][:],
+            'lon':merged_nc.variables['Longitude'][:],
             })
         
         
-        data_temp = odl.oracles_p3_merge_subset(date, with_updated_cal=True)
-        data = data.append(data_temp[vars2get], ignore_index=True, sort=False)
+        # Average both datasets into time blocks:
+        if block_secs is not None:
+            wisper_t30 = np.round(wisper_updated['Start_UTC']/30)*30
+            wisper_updated = wisper_updated.groupby(wisper_t30, as_index=False).mean()
+            merge_t30 = np.round(merged_pd['Start_UTC']/30)*30
+            merged_pd = merged_pd.groupby(merge_t30, as_index=False).mean()      
         
+        
+        # Combine wisper and merge data, then append:
+        data = data.append(
+            wisper_updated.merge(merged_pd, on='Start_UTC', how='inner'), 
+            ignore_index=True, sort=False
+            )
+        
+    
     data.replace(-9999, np.nan, inplace=True) # Change missing value flag.    
 
-    # Optional average into blocks:
-    if block_secs is not None:
-        data.reset_index(inplace=True)
-        data['block'] = np.round(data.index.values/block_secs)*block_secs
-        data = data.groupby('block').mean()
 
     # Only keep data where humidity is greater than passed value:
     data = data.loc[data['h2o_gkg']>morethanx_gkg]
 
     # Add dxs as new column:
     data['dxs_permil'] = data['dD_permil'] - 8*data['d18O_permil']
+    
+    
+    pd.options.mode.chained_assignment = 'warn'  # Restore warning.
+
     
     return data
 
@@ -329,8 +377,8 @@ def p3_flightdates(year):
 
 
         
-#if __name__=='__main__': 
-#    lev3product_allyears()
+if __name__=='__main__': 
+    lev3product_allyears()
 
 
 
