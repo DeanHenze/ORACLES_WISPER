@@ -9,8 +9,8 @@ WISPER data file.
 """
 
 
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np # 1.19.2
+import matplotlib.pyplot as plt # 3.3.2
 
 
 def add_precision_cols(data, date, test_plot=False):
@@ -25,7 +25,7 @@ def add_precision_cols(data, date, test_plot=False):
         Set to True to make a test plot of computed precisions.
         
     Returns:
-        None, 'data' is modified in place.
+        data with precision columns.
     """
     
     # Calculate Pi2 precisions as functions of log humidity:
@@ -65,3 +65,6 @@ def add_precision_cols(data, date, test_plot=False):
         ax1.set_xlabel('log humidity, log(ppmv)', fontsize=14)
         ax1.set_ylabel('std dD, permil', fontsize=14)
         ax2.set_ylabel('std d18O, permil', fontsize=14)
+        
+        
+    return data

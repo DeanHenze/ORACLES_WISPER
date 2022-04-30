@@ -13,7 +13,7 @@ data files.
 import os
 
 # Third party:
-import numpy as np
+import numpy as np # 1.19.2
 
 # My modules:
 import preprocess 
@@ -29,18 +29,6 @@ path_caldir = r"./WISPER_calibrated_data/"
 if not os.path.exists(path_caldir): os.makedirs(path_caldir)
 
 
-# ORACLES research flight dates where WISPER took good data:
-dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
-                  '20160912','20160914','20160918','20160920','20160924',
-                  '20160925']
-dates2017_good = ['20170812','20170813','20170815','20170817','20170818',
-                  '20170821','20170824','20170826','20170828','20170830',
-                  '20170831','20170902']
-dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
-                  '20181012','20181015','20181017','20181019','20181021',
-                  '20181023']
-
-
 
 # Calibration of a single file:
 def calibrate_file(date):
@@ -49,74 +37,73 @@ def calibrate_file(date):
     """
     year = date[:4]
     
-    # Preprocessing procedure:
-    pre = preprocess.Preprocessor(date)
-    pre.preprocess_file()
+    # Preprocessing:
+    pre = preprocess.Preprocessor(date) # Class instance loads the data.
+    pre.preprocess_file() # Apply preprocessing.
     #pre.test_plots()
-    
-    data_prepro = pre.preprodata.copy()
+    data_prepro = pre.preprodata.copy() # Copy to pass on for calibration.
     data_prepro.replace(-9999, np.nan, inplace=True)
 
     # Time synchronization:
-    data_syncd = time_sync.wisper_tsync(data_prepro, date)
+    data_cal = time_sync.wisper_tsync(data_prepro, date)
     #time_sync.test_plot(pre.preprodata, data_syncd, date)
     
     # Add precision columns:
-    stdcols.add_precision_cols(data_syncd, date, test_plot=False)
+    data_cal = stdcols.add_precision_cols(data_cal, date, test_plot=False)
     
     # Pic1 calibration (only relevant for 2017 and 2018 sampling periods):
     if year in ['2017','2018']:
-        data_pic1cal = pic1_cal.apply_cal(data_syncd, date, testplots=False)
-        #data_pic1cal = pic1_cal.apply_cal(data_syncd, date, testplots=True)
+        data_cal = pic1_cal.apply_cal(data_cal, date, testplots=False)
+        #data_cal = pic1_cal.apply_cal(data_cal, date, testplots=True)
     else: 
-        data_pic1cal = data_syncd
+        data_cal = data_cal
         
     # Pic2 calibration:
-    data_pic2cal = pic2_cal.apply_cal(data_pic1cal, date, testplots=False)
-    #data_pic2cal = pic2_cal.apply_cal(data_pic1cal, date, testplots=True)
+    data_cal = pic2_cal.apply_cal(data_cal, date, testplots=False)
+    #data_cal = pic2_cal.apply_cal(data_cal, date, testplots=True)
     
     # Decimal rounding:
     if year == '2016':
-        data_pic2cal = data_pic2cal.round({'Start_UTC':0, 'h2o_tot2':0, 
-                                           'dD_tot2':1, 'std_dD_tot2':1, 
-                                           'd18O_tot2':1, 'std_d18O_tot2':1})
+        data_cal = data_cal.round({'Start_UTC':0, 'h2o_tot2':0, 
+                                   'dD_tot2':1, 'std_dD_tot2':1, 
+                                   'd18O_tot2':1, 'std_d18O_tot2':1})
     if year in ['2017','2018']:
-        data_pic2cal = data_pic2cal.round({'Start_UTC':0, 'wisper_valve_state':0, 
-                                           'h2o_tot1':0, 'h2o_tot2':0, 
-                                           'h2o_cld':0, 'dD_tot1':1, 
-                                           'std_dD_tot1':1, 
-                                           'dD_tot2':1, 'std_dD_tot2':1, 
-                                           'dD_cld':1, 'std_dD_cld':1, 
-                                           'd18O_tot1':1, 'std_d18O_tot1':1,
-                                           'd18O_tot2':1, 'std_d18O_tot2':1, 
-                                           'd18O_cld':1, 'std_d18O_cld':1,
-                                           'cvi_lwc':2, 'cvi_enhance':2, 
-                                           'cvi_dcut50':2, 'cvi_inFlow':2,
-                                           'cvi_xsFlow':2, 'cvi_userFlow':2})
+        data_cal = data_cal.round({'Start_UTC':0, 'wisper_valve_state':0, 
+                                   'h2o_tot1':0, 'h2o_tot2':0, 
+                                   'h2o_cld':0, 'dD_tot1':1, 
+                                   'std_dD_tot1':1, 
+                                   'dD_tot2':1, 'std_dD_tot2':1, 
+                                   'dD_cld':1, 'std_dD_cld':1, 
+                                   'd18O_tot1':1, 'std_d18O_tot1':1,
+                                   'd18O_tot2':1, 'std_d18O_tot2':1, 
+                                   'd18O_cld':1, 'std_d18O_cld':1,
+                                   'cvi_lwc':2, 'cvi_enhance':2, 
+                                   'cvi_dcut50':2, 'cvi_inFlow':2,
+                                   'cvi_xsFlow':2, 'cvi_userFlow':2})
         
     # Rearrange columns:
     if year=='2016':
-        data_pic2cal = data_pic2cal[['Start_UTC','h2o_tot2', 'dD_tot2', 
-                                     'std_dD_tot2','d18O_tot2', 'std_d18O_tot2']]
+        data_cal = data_cal[['Start_UTC','h2o_tot2', 'dD_tot2', 
+                             'std_dD_tot2','d18O_tot2', 'std_d18O_tot2']]
     if year in ['2017','2018']:
-        data_pic2cal = data_pic2cal[['Start_UTC', 'wisper_valve_state', 'h2o_tot1', 
-                                     'h2o_tot2', 'h2o_cld', 'dD_tot1', 
-                                     'std_dD_tot1', 'dD_tot2', 'std_dD_tot2', 
-                                     'dD_cld', 'std_dD_cld', 'd18O_tot1', 
-                                     'std_d18O_tot1', 'd18O_tot2', 'std_d18O_tot2', 
-                                     'd18O_cld', 'std_d18O_cld', 'cvi_lwc', 
-                                     'cvi_enhance', 'cvi_dcut50', 'cvi_inFlow', 
-                                     'cvi_xsFlow', 'cvi_userFlow']]
+        data_cal = data_cal[['Start_UTC', 'wisper_valve_state', 'h2o_tot1', 
+                             'h2o_tot2', 'h2o_cld', 'dD_tot1', 
+                             'std_dD_tot1', 'dD_tot2', 'std_dD_tot2', 
+                             'dD_cld', 'std_dD_cld', 'd18O_tot1', 
+                             'std_d18O_tot1', 'd18O_tot2', 'std_d18O_tot2', 
+                             'd18O_cld', 'std_d18O_cld', 'cvi_lwc', 
+                             'cvi_enhance', 'cvi_dcut50', 'cvi_inFlow', 
+                             'cvi_xsFlow', 'cvi_userFlow']]
     
     # Save calibrated data in a temporary file:
-    data_pic2cal.fillna(-9999, inplace=True)  
+    data_cal.fillna(-9999, inplace=True)  
     fname = "WISPER_calibrated_%s.ict" % date
-    data_pic2cal.to_csv(path_caldir + fname, index=False)
+    data_cal.to_csv(path_caldir + fname, index=False)
     
     # Add file header and save with final filename:
     add_file_header(date)
     
-    del pre, data_syncd, data_pic1cal, data_pic2cal
+    del pre, data_cal
     
     
     
@@ -153,6 +140,19 @@ def add_file_header(date):
         os.unlink(fname_calfile)
     
 
+
+# ORACLES research flight dates where WISPER took good data:
+dates2016_good = ['20160830','20160831','20160902','20160904','20160910',
+                  '20160912','20160914','20160918','20160920','20160924',
+                  '20160925']
+dates2017_good = ['20170812','20170813','20170815','20170817','20170818',
+                  '20170821','20170824','20170826','20170828','20170830',
+                  '20170831','20170902']
+dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
+                  '20181012','20181015','20181017','20181019','20181021',
+                  '20181023']
+
+# Apply calibration to all data:    
 for date in dates2016_good: calibrate_file(date)
 for date in dates2017_good: calibrate_file(date)
 for date in dates2018_good: calibrate_file(date)

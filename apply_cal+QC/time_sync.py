@@ -31,106 +31,12 @@ import netCDF4 as nc # 1.5.3
 import matplotlib.pyplot as plt # 3.3.2
 
 
+
 # Get the path of the directory containing this script (used in combination 
 # with relative paths to locate datafiles):
 filename = inspect.getframeinfo(inspect.currentframe()).filename
 scriptpath = os.path.dirname(os.path.abspath(filename))
 
-
-def data_with_pressure(df_wisper, date):
-    """
-    Combine WISPER data with pressure data from the P3 merge file for 
-    a single flight. Return combined data as a pandas df.
-    
-    Inputs
-    ------
-    df_wisper: pandas df.
-        WISPER data for a single flight, -9999.0 flags replace with np.nan.
-        
-    date: str.
-        Flight date 'yyyymmdd'.
-    """    
-
-    # Load P3 merge data as nc dataset (has the pressure data):
-    path_p3merge = scriptpath + "\\P3_merge_data\\"
-    year = date[0:4]
-    if year=='2016': revnum = 'R25'
-    if year=='2017': revnum = 'R18'
-    if year=='2018': revnum = 'R8'
-    fname_merge = "mrg1_P3_" + date + "_" + revnum + ".nc"
-    merge = nc.Dataset(path_p3merge + fname_merge)
-        # Time and pressure as a separate df, NAN-masked:
-    p = pd.DataFrame({'Static_Pressure':merge.variables['Static_Pressure'][:], 
-                      'Start_UTC':merge.variables['Start_UTC'][:]})
-    p.replace(-9999.0, np.nan, inplace=True)
-        
-    # Return wisper merged with pressure data:
-    return pd.merge(df_wisper, p, how='inner', on='Start_UTC', sort=True)
-
-
-def time_shift(data, P_var, t_var, shift_vars, params):
-    """  
-    Time-shift variables (columns) in a pandas df by a linear pressure- 
-    dependent function. Return shifted data as a pandas df.
-    
-    Inputs
-    ------
-    data: pandas df.
-        Includes columns for the variables to shift as well as time and 
-        pressure columns (other columns will be ignored).
-    
-    t_var, P_var: str's. 
-        Column headers of the time and pressure variables in 'data'.
-    
-    shift_vars: list of str's.
-        The column headers of the vars to shift.
-    
-    params: 2-element list/tuple.
-        Slope (first element) and offset (second) for linear function of 
-        pressure.
-    """
-    # Create a new df with the time, pressure, and shift_vars:
-    data_shift = data.loc[:,[t_var,P_var]+shift_vars].copy()
-    
-    
-    # Apply pressure dependent correction and round to the nearest integer:
-        # First remove any unphyically high pressures:
-    data_shift.loc[data_shift[P_var]>1100, P_var]=np.nan
-        # Apply shift, to nearest second:
-    data_shift.loc[:,t_var] =                                                 \
-        data_shift[t_var] + params[0]*data_shift[P_var] + params[1]
-    data_shift.loc[:,t_var] = data_shift[t_var].round(decimals=0)
-    
-    
-    # Average over any duplicate timestamps as a result of the correction:
-    data_shift = data_shift.groupby(by=t_var, as_index=False).mean()
-    
-    
-    # Interpolate any time gaps resulting from the correction, if needed:
-        # Check for gaps greater than 1s. If none, good to go:
-    dt = np.array(data_shift[t_var].iloc[1:])-np.array(data_shift[t_var].iloc[:-1])
-    
-    if len(np.where(dt>1)[0])!=0:
-        # If there are gaps > 1s...
-        print('\t time gap greater than 1 s after the shift, fixing...')
-        # Create reference time var with no gaps:
-        t0 = data_shift[t_var].iloc[0]; tf = data_shift[t_var].iloc[-1]
-        t_ref = pd.DataFrame({'t_ref':np.arange(t0,tf+1,1)})
-        # Merge data with ref time to get Nan rows in the df where needed:
-        data_shift = data_shift.merge(t_ref, how='outer', left_on=t_var, 
-                                      right_on='t_ref',sort=True)   
-        # Interpolate and verify everything went well:
-        data_shift.interpolate(method='linear', axis=0, limit=3, inplace=True)
-        if np.sum( pd.notnull(data_shift[t_var]) ) != tf-t0+1:
-            print('\t WARNING: Unsuccessful averaging/interpolation.')
-        else:
-            print('\t Fixed!')
-    
-    
-    # Merge shifted data into original df, replacing the original vars:
-    data_dropped = data.drop(shift_vars, axis=1)
-    return data_dropped.merge(data_shift[[t_var]+shift_vars], on=t_var, 
-                              how='outer',sort=True)
 
 
 def wisper_tsync(df_wisper, date):        
@@ -217,7 +123,106 @@ def wisper_tsync(df_wisper, date):
     # Return data after dropping pressure column:
     data.drop(['Static_Pressure'], axis=1, inplace=True)
     return data
+
+
+
+def time_shift(data, P_var, t_var, shift_vars, params):
+    """  
+    Time-shift variables (columns) in a pandas df by a linear pressure- 
+    dependent function. Return shifted data as a pandas df.
     
+    Inputs
+    ------
+    data: pandas df.
+        Includes columns for the variables to shift as well as time and 
+        pressure columns (other columns will be ignored).
+    
+    t_var, P_var: str's. 
+        Column headers of the time and pressure variables in 'data'.
+    
+    shift_vars: list of str's.
+        The column headers of the vars to shift.
+    
+    params: 2-element list/tuple.
+        Slope (first element) and offset (second) for linear function of 
+        pressure.
+    """
+    # Create a new df with the time, pressure, and shift_vars:
+    data_shift = data.loc[:,[t_var,P_var]+shift_vars].copy()
+    
+    
+    # Apply pressure dependent correction and round to the nearest integer:
+        # First remove any unphyically high pressures:
+    data_shift.loc[data_shift[P_var]>1100, P_var]=np.nan
+        # Apply shift, to nearest second:
+    data_shift.loc[:,t_var] =                                                 \
+        data_shift[t_var] + params[0]*data_shift[P_var] + params[1]
+    data_shift.loc[:,t_var] = data_shift[t_var].round(decimals=0)
+    
+    
+    # Average over any duplicate timestamps as a result of the correction:
+    data_shift = data_shift.groupby(by=t_var, as_index=False).mean()
+    
+    
+    # Interpolate any time gaps resulting from the correction, if needed:
+        # Check for gaps greater than 1s. If none, good to go:
+    dt = np.array(data_shift[t_var].iloc[1:])-np.array(data_shift[t_var].iloc[:-1])
+    
+    if len(np.where(dt>1)[0])!=0:
+        # If there are gaps > 1s...
+        print('\t time gap greater than 1 s after the shift, fixing...')
+        # Create reference time var with no gaps:
+        t0 = data_shift[t_var].iloc[0]; tf = data_shift[t_var].iloc[-1]
+        t_ref = pd.DataFrame({'t_ref':np.arange(t0,tf+1,1)})
+        # Merge data with ref time to get Nan rows in the df where needed:
+        data_shift = data_shift.merge(t_ref, how='outer', left_on=t_var, 
+                                      right_on='t_ref',sort=True)   
+        # Interpolate and verify everything went well:
+        data_shift.interpolate(method='linear', axis=0, limit=3, inplace=True)
+        if np.sum( pd.notnull(data_shift[t_var]) ) != tf-t0+1:
+            print('\t WARNING: Unsuccessful averaging/interpolation.')
+        else:
+            print('\t Fixed!')
+    
+    
+    # Merge shifted data into original df, replacing the original vars:
+    data_dropped = data.drop(shift_vars, axis=1)
+    return data_dropped.merge(data_shift[[t_var]+shift_vars], on=t_var, 
+                              how='outer',sort=True)
+
+
+
+def data_with_pressure(df_wisper, date):
+    """
+    Combine WISPER data with pressure data from the P3 merge file for 
+    a single flight. Return combined data as a pandas df.
+    
+    Inputs
+    ------
+    df_wisper: pandas df.
+        WISPER data for a single flight, -9999.0 flags replace with np.nan.
+        
+    date: str.
+        Flight date 'yyyymmdd'.
+    """    
+
+    # Load P3 merge data as nc dataset (has the pressure data):
+    path_p3merge = scriptpath + "\\P3_merge_data\\"
+    year = date[0:4]
+    if year=='2016': revnum = 'R25'
+    if year=='2017': revnum = 'R18'
+    if year=='2018': revnum = 'R8'
+    fname_merge = "mrg1_P3_" + date + "_" + revnum + ".nc"
+    merge = nc.Dataset(path_p3merge + fname_merge)
+        # Time and pressure as a separate df, NAN-masked:
+    p = pd.DataFrame({'Static_Pressure':merge.variables['Static_Pressure'][:], 
+                      'Start_UTC':merge.variables['Start_UTC'][:]})
+    p.replace(-9999.0, np.nan, inplace=True)
+        
+    # Return wisper merged with pressure data:
+    return pd.merge(df_wisper, p, how='inner', on='Start_UTC', sort=True)
+   
+ 
 
 def test_plot(df1, df2, date):
     """
