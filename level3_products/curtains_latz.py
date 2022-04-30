@@ -21,7 +21,7 @@ import xarray as xr
 import netCDF4 as nc # 1.3.1
 from warnings import filterwarnings
 
-# My modules:
+# Local code:
 import oversampler
 
 
@@ -286,8 +286,10 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
     
     for date in dates:
         
-        # Load wisper data. Get a single column for each variable filled with 
-        # Pic1 instrument data where available and Pic2 otherwise:
+        # 1) Load wisper data. 
+        # 2) Get a single column for each variable filled with Pic1 instrument 
+        #    data where available and Pic2 otherwise:
+        # 3) Convert water concentration from ppmv units to g/kg.
         wisper = pd.read_csv(
             relpath_wisper + "WISPER_P3_%s_R2.ict" % date, 
             header=wisper_headerline
@@ -295,6 +297,7 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
 
         if year == '2016': # Only Pic2 data available.
             wisper_updated = wisper[['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']]
+            wisper_updated['h2o_tot2'] = convert_q(wisper_updated['h2o_tot2'])
             wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
  
         elif year in ['2017','2018']: # Pic1 and Pic2 data available.
@@ -304,6 +307,7 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
                 inan = wisper_updated[k].isnull() # Where Pic1 has NAN
                 wisper_updated.loc[inan, k] = wisper.loc[inan, k2].copy() # Replace with Pic2.
             
+            wisper_updated['h2o_tot1'] = convert_q(wisper_updated['h2o_tot1'])
             wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
            
         
@@ -374,9 +378,17 @@ def p3_flightdates(year):
         return ['20180927','20180930','20181003','20181007',
                 '20181010','20181012','20181015','20181017',
                 '20181019','20181021','20181023']
-
+    
+    
+    
+def convert_q(q):
+    """
+    Converts specific humidity from units of ppmv to g/kg.
+    """
+    return 0.622*q/1000
 
         
+
 if __name__=='__main__': 
     lev3product_allyears()
 
