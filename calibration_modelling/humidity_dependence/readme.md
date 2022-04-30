@@ -1,21 +1,16 @@
-# Humidity dependence correction directory contents:
+This directory contains calibration data and processing code to tune model parameters for 
+the humidity-dependence correction of Picarro isotope ratio measurements. There is data and 
+processing code for two Picarros, "Mako" and "Gulper".
 
-mako_humidity_dependence_cals.csv
-----------------------------------
-Data for all Mako isotope ratio humidity dependence calibrations for the ORACLES field 
-project. The variables dD*_permil and d18O*_permil are shifted relative to the dD and d18O 
-measurements so that dD*=0 and d18O*=0 for the measurement taken at the highest humidity 
-for the respective calibration run. 
 
-gulper_humidity_dependence_cals.csv
-----------------------------------
-Same as mako_humidity_dependence_cals.csv but for Gulper. This file also includes standard deviation columns.
+The python script ```fit_qdependence.py``` will produce parameter fits to the function 
+described by Equation B2 of [Henze et. al., 2022](https://doi.org/10.5194/essd-14-1811-2022). 
+```fit_qdependence.py``` produces fits for both Mako and Gulper, stored in the output 
+```qdependence_fit_results.csv```.
 
-fit_qdependence.py
-------------------
-Python script to fit model parameters to calibration data. The script fits models for both 
-the Mako and Gulper Picarros.
 
-qdependence_fit_results.cvs
----------------------------
-Parameter fit results and uncertainties.
+Calibration data to tune the model (from several lab tests) can be found in 
+```mako_humidity_dependence_cals.csv``` and ```gulper_humidity_dependence_cals.csv```. The 
+variables dD*_permil and d18O*_permil in those files are the dD and d18O measurements with 
+a constant offset, such   that dD*=0 and d18O*=0 for the measurement taken at the highest 
+humidity for that particular calibration run.
