@@ -4,7 +4,7 @@ processing code for two Picarros, "Mako" and "Gulper".
 
 
 The python script ```fit_qdependence.py``` will produce parameter fits to the function 
-described by Equation B2 of [Henze et. al., 2022](https://doi.org/10.5194/essd-14-1811-2022). 
+described by Equation B2 of [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022). 
 ```fit_qdependence.py``` produces fits for both Mako and Gulper, stored in the output 
 ```qdependence_fit_results.csv```.
 
