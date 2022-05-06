@@ -31,7 +31,8 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
         Flight date, 'yyyymmdd'.
     
     mergevarkeys_nc: list/tuple of str's.
-        Keys for variables in the merge file to include.
+        Keys for variables in the merge file to include. The time variable 
+        will already be added and should not be included in this list.
     
     mergevarkeys_return: list/tuple of str's.
         New keys to assign the merge file vars. Same length as mergevarkeys_nc.
@@ -77,6 +78,7 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
         relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
         )
     merged_pd = pd.DataFrame({})
+    merged_pd['Start_UTC'] = merged_nc.variables['Start_UTC'][:]
     for knc, knew in zip(mergevarkeys_nc, mergevarkeys_return):
         merged_pd[knew] = merged_nc.variables[knc][:]
     

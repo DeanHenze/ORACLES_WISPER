@@ -280,8 +280,8 @@ def get_data(year, dtblock=30, morethanx_gkg=0.2):
     
     if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
     if year == '2018': altitude_key='GPS_Altitude'
-    mergevarkeys_nc = ['Start_UTC', altitude_key, 'Latitude', 'Longitude']
-    mergevarkeys_return = ['Start_UTC', 'height_m', 'lat', 'lon']
+    mergevarkeys_nc = [altitude_key, 'Latitude', 'Longitude']
+    mergevarkeys_return = ['height_m', 'lat', 'lon']
     
     for date in dates:
 
