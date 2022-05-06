@@ -18,9 +18,8 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 
-# My modules:
-if r'../..' not in sys.path: sys.path.insert(0,r'../..')
-from my_python_modules import oracles_data_loader as odl
+# Local code:
+import wisperaddvars
 
 
 
@@ -63,15 +62,12 @@ def vertical_profiles(year):
     ## Load and append data for all profiles in all flights:
     profiletable = pd.read_csv("./vertical_profile_times.csv")
     
-    relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
-    wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
-    relpath_merged = r"../apply_cal+QC/P3_merge_data/"
-    merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
-    
-    for date, rows in profiletable:
+    for date, rows_date in profiletable.groupby(by='date'):
         
-        # Load WISPER data:
-        wisper = 
+        # Load WISPER data with added vars from the merge file:
+        addvarkeys_nc = []
+        data = data_singledate(date, mergevarkeys_nc, mergevarkeys_return)
+
         
     
     for date in dates:
@@ -250,6 +246,23 @@ def get_p3data(date):
                                     p3data['cvi_enhance'].values)
         p3data['dxs_cld'] = p3data['dD_cld_permil'] - 8*p3data['d18O_cld_permil']
     return p3data
+
+
+
+def get_p3data(date):
+    """
+    Load WISPER data with added vars from the merge file:
+    """
+    
+    if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
+    if year == '2018': altitude_key='GPS_Altitude'
+    addvarkeys_nc = ['Start_UTC', altitude_key, 'Latitude', 
+                     'Longitude', 'Static_Air_Temp', 'Static_Pressure'
+                     ]
+    varkeys_assign = []
+    data = data_singledate(date, mergevarkeys_nc, mergevarkeys_return)
+
+            
 
 
 
