@@ -4,8 +4,9 @@ Created on Thu May  5 16:57:20 2022
 
 @author: Dean
 
-Return WISPER data with a set of other variable from the merge file. Returns 
-data for a single flight.
+function 'data_singledate'
+    Return WISPER data with a set of other variable from the merge file. 
+    Returns data for a single flight.
 """
 
 
@@ -21,10 +22,13 @@ import convertq
 
 def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
     """
+    Return WISPER data with a set of other variable from the merge file. 
+    Returns data for a single flight.
+    
     Inputs
     ------
     date: str.
-        'yyyymmdd'.
+        Flight date, 'yyyymmdd'.
     
     mergevarkeys_nc: list/tuple of str's.
         Keys for variables in the merge file to include.
@@ -54,23 +58,17 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
 
     if year == '2016': # Only Pic2 data available.
         wisper_new = wisper[['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']]
-        #wisper_new['h2o_tot2'] = convertq.ppmv_to_gkg(wisper_new['h2o_tot2'])
-        #wisper_new.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
- 
+
     elif year in ['2017','2018']: # Pic1 and Pic2 data available.
         wisper_new = wisper[['Start_UTC','h2o_tot1','dD_tot1','d18O_tot1']] # Pic1 values.
         for k in wisper_new.columns[1:]:
             k2 = k[:-1]+'2'
             inan = wisper_new[k].isnull() # Where Pic1 has NAN
             wisper_new.loc[inan, k] = wisper.loc[inan, k2].copy() # Replace with Pic2.
-        
-        #wisper_new['h2o_tot1'] = convertq.ppmv_to_gkg(wisper_new['h2o_tot1'])
-        #wisper_new.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
-        
+
     wisper_new.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
     wisper_new['h2o_gkg'] = convertq.ppmv_to_gkg(wisper_new['h2o_gkg'])
     
-       
     
     # Additional variables
     # Load merged files as nc.Dataset object and place a subset of the 
@@ -84,15 +82,4 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
     
     
     return wisper_new.merge(merged_pd, on='Start_UTC', how='inner')
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+  

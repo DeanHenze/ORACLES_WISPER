@@ -273,14 +273,7 @@ def get_data(year, dtblock=30, morethanx_gkg=0.2):
     
     print("Retrieving data.")
     
-    
-    # Some info necessary to load the datasets:
-    #relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
-    #wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
-    #relpath_merged = r"../apply_cal+QC/P3_merge_data/"
-    #merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
-    
-    
+
     # Load and append data for each flight:
     data = pd.DataFrame({}) # Will hold all data.
     dates = p3_flightdates(year)
@@ -305,61 +298,6 @@ def get_data(year, dtblock=30, morethanx_gkg=0.2):
 
 
         data = data.append(data_singleflight, ignore_index=True, sort=False)
-
-        """    
-        # 1) Load wisper data. 
-        # 2) Get a single column for each variable filled with Pic1 instrument 
-        #    data where available and Pic2 otherwise:
-        # 3) Convert water concentration from ppmv units to g/kg.
-        wisper = pd.read_csv(
-            relpath_wisper + "WISPER_P3_%s_R2.ict" % date, 
-            header=wisper_headerline
-            )
-
-        if year == '2016': # Only Pic2 data available.
-            wisper_updated = wisper[['Start_UTC','h2o_tot2','dD_tot2','d18O_tot2']]
-            wisper_updated['h2o_tot2'] = convert_q(wisper_updated['h2o_tot2'])
-            wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
- 
-        elif year in ['2017','2018']: # Pic1 and Pic2 data available.
-            wisper_updated = wisper[['Start_UTC','h2o_tot1','dD_tot1','d18O_tot1']] # Pic1 values.
-            for k in wisper_updated.columns[1:]:
-                k2 = k[:-1]+'2'
-                inan = wisper_updated[k].isnull() # Where Pic1 has NAN
-                wisper_updated.loc[inan, k] = wisper.loc[inan, k2].copy() # Replace with Pic2.
-            
-            wisper_updated['h2o_tot1'] = convert_q(wisper_updated['h2o_tot1'])
-            wisper_updated.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
-           
-        
-        # Load merged files as nc.Dataset object and place a subset of the 
-        # vars in a pandas df:
-        merged_nc = nc.Dataset(
-            relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
-            )
-        if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
-        if year == '2018': altitude_key='GPS_Altitude'
-        merged_pd = pd.DataFrame({ # Data to use in curtains.
-            'Start_UTC':merged_nc.variables['Start_UTC'][:],
-            'height_m':merged_nc.variables[altitude_key][:],
-            'lat':merged_nc.variables['Latitude'][:],
-            'lon':merged_nc.variables['Longitude'][:],
-            })
-        
-        # Average both datasets into time blocks:
-        if block_secs is not None:
-            wisper_t30 = np.round(wisper_updated['Start_UTC']/30)*30
-            wisper_updated = wisper_updated.groupby(wisper_t30, as_index=False).mean()
-            merge_t30 = np.round(merged_pd['Start_UTC']/30)*30
-            merged_pd = merged_pd.groupby(merge_t30, as_index=False).mean()      
-        
-    
-        # Combine wisper and merge data, then append:
-        data = data.append(
-            wisper_updated.merge(merged_pd, on='Start_UTC', how='inner'), 
-            ignore_index=True, sort=False
-            )
-        """
         
     
     data.replace(-9999, np.nan, inplace=True) # Change missing value flag.    
@@ -412,25 +350,3 @@ def convert_q(q):
 
 if __name__=='__main__': 
     lev3product_allyears()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
