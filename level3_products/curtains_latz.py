@@ -22,6 +22,7 @@ import netCDF4 as nc # 1.3.1
 from warnings import filterwarnings
 
 # Local code:
+import wisperaddvars
 import oversampler
 
 
@@ -99,7 +100,7 @@ def lev3_product(year):
     elif year in ['2017','2018']: 
         lat_curtain = np.arange(-14, 1 + dlat_grid, dlat_grid)
         # Compute:
-    curtains = compute_curtains(get_data(year, block_secs=30),
+    curtains = compute_curtains(get_data(year, dtblock=30),
                                 lat_curtain, alt_curtain, h2o_weights=True
                                 ) 
         # Assign:
@@ -248,7 +249,7 @@ def compute_curtains(
 
 
 
-def get_data(year, block_secs=30, morethanx_gkg=0.2):
+def get_data(year, dtblock=30, morethanx_gkg=0.2):
     """
     Returns all P-3 data for the passed ORACLES year (str). Returns the 
     following variables:
@@ -274,18 +275,38 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
     
     
     # Some info necessary to load the datasets:
-    relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
-    wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
-    relpath_merged = r"../apply_cal+QC/P3_merge_data/"
-    merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
+    #relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
+    #wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
+    #relpath_merged = r"../apply_cal+QC/P3_merge_data/"
+    #merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
     
     
     # Load and append data for each flight:
     data = pd.DataFrame({}) # Will hold all data.
     dates = p3_flightdates(year)
     
+    if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
+    if year == '2018': altitude_key='GPS_Altitude'
+    mergevarkeys_nc = ['Start_UTC', altitude_key, 'Latitude', 'Longitude']
+    mergevarkeys_return = ['Start_UTC', 'height_m', 'lat', 'lon']
+    
     for date in dates:
+
+        # WISPER data with lat, lon, height:
+        data_singleflight = wisperaddvars.data_singledate(
+            date, mergevarkeys_nc, mergevarkeys_return
+            )
         
+        # Average both datasets into time blocks:
+        if dtblock is not None:
+            dt = dtblock
+            time_blocked = np.round(data_singleflight['Start_UTC']/dt)*dt
+            data_singleflight = data_singleflight.groupby(time_blocked, as_index=False).mean()
+
+
+        data = data.append(data_singleflight, ignore_index=True, sort=False)
+
+        """    
         # 1) Load wisper data. 
         # 2) Get a single column for each variable filled with Pic1 instrument 
         #    data where available and Pic2 otherwise:
@@ -325,7 +346,6 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
             'lon':merged_nc.variables['Longitude'][:],
             })
         
-        
         # Average both datasets into time blocks:
         if block_secs is not None:
             wisper_t30 = np.round(wisper_updated['Start_UTC']/30)*30
@@ -333,12 +353,13 @@ def get_data(year, block_secs=30, morethanx_gkg=0.2):
             merge_t30 = np.round(merged_pd['Start_UTC']/30)*30
             merged_pd = merged_pd.groupby(merge_t30, as_index=False).mean()      
         
-        
+    
         # Combine wisper and merge data, then append:
         data = data.append(
             wisper_updated.merge(merged_pd, on='Start_UTC', how='inner'), 
             ignore_index=True, sort=False
             )
+        """
         
     
     data.replace(-9999, np.nan, inplace=True) # Change missing value flag.    
