@@ -86,7 +86,7 @@ def wisperaddvars(date):
     addvarkeys_nc = [altitude_key, 'Latitude', 'Longitude', 
                      'Static_Air_Temp', 'Static_Pressure'
                      ]
-    varkeys_assign = ['alt', 'lat', 'lon', 'T_C', 'P_hPa']
+    varkeys_assign = ['height_m', 'lat', 'lon', 'T_C', 'P_hPa']
     merged_pd = pd.DataFrame({})
     merged_pd['Start_UTC'] = merged_nc.variables['Start_UTC'][:]
     for knc, knew in zip(addvarkeys_nc, varkeys_assign):
