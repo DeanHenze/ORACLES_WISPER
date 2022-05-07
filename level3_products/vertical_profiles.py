@@ -5,6 +5,10 @@ Created on Wed Feb  2 13:03:16 2022
 @author: Dean
 
 Create the vertical profiles dataset.
+
+
+To do:
+    - Remember to convert temperature from deg C to deg K.
 """
 
 
@@ -256,11 +260,11 @@ def get_p3data(date):
     
     if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
     if year == '2018': altitude_key='GPS_Altitude'
-    addvarkeys_nc = ['Start_UTC', altitude_key, 'Latitude', 
-                     'Longitude', 'Static_Air_Temp', 'Static_Pressure'
+    addvarkeys_nc = [altitude_key, 'Latitude', 'Longitude', 
+                     'Static_Air_Temp', 'Static_Pressure'
                      ]
-    varkeys_assign = []
-    data = data_singledate(date, mergevarkeys_nc, mergevarkeys_return)
+    varkeys_assign = ['alt', 'lat', 'lon', 'T', 'P']
+    data = wisperaddvars.data_singledate(date, addvarkeys_nc, varkeys_assign)
 
             
 
