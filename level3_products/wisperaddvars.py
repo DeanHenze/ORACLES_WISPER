@@ -17,26 +17,23 @@ import netCDF4 as nc # 1.3.1
 
 # Local code
 import convertq
+import cvi_cwc
 
 
 
-def wisperaddvars(date, mergevarkeys_nc, 
-                  mergevarkeys_return, add_cloudvars=False):
+def wisperaddvars(date):
     """
     Return WISPER data with a set of other variable from the merge file. 
-    Returns data for a single flight.
+    Returns data for a single flight. Other variables included are:
+        longitude, latitude, altitude
+        temperature, pressure
+    If a 2017 or 2018 sampling period flight, includes WISPER cwc and isotope 
+    ratios. cwc is corrected for enhancement factor and density.
     
     Inputs
     ------
     date: str.
         Flight date, 'yyyymmdd'.
-    
-    mergevarkeys_nc: list/tuple of str's.
-        Keys for variables in the merge file to include. The time variable 
-        will already be added and should not be included in this list.
-    
-    mergevarkeys_return: list/tuple of str's.
-        New keys to assign the merge file vars. Same length as mergevarkeys_nc.
     
     add_cloudvars: bool.
         If True, include following WISPER cloud measurements:
@@ -47,35 +44,59 @@ def wisperaddvars(date, mergevarkeys_nc,
     year = date[0:4]
     
     
-    # Path and filename head info for merge data:
+    # WISPER vars:
+    wisper = wisperdata(date)
+        
+
+    # Additional variables merged into wisper:
+        # Path and filename head info for merge data:
     relpath_merged = r"../apply_cal+QC/P3_merge_data/"
     merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
-    
-    
-    # Additional variables
-    # Load merged files as nc.Dataset object and place a subset of the 
-    # vars in a pandas df:
+
+        # Load merged files as nc.Dataset object and place a subset of the 
+        # vars in a pandas df:
     merged_nc = nc.Dataset(
         relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
         )
+    if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
+    if year == '2018': altitude_key='GPS_Altitude'
+    addvarkeys_nc = [altitude_key, 'Latitude', 'Longitude', 
+                     'Static_Air_Temp', 'Static_Pressure'
+                     ]
+    varkeys_assign = ['alt', 'lat', 'lon', 'T_C', 'P_hPa']
     merged_pd = pd.DataFrame({})
     merged_pd['Start_UTC'] = merged_nc.variables['Start_UTC'][:]
-    for knc, knew in zip(mergevarkeys_nc, mergevarkeys_return):
+    for knc, knew in zip(addvarkeys_nc, varkeys_assign):
         merged_pd[knew] = merged_nc.variables[knc][:]
+        
+        # Convert temperature to units of degK:
+    merged_pd['T_K'] = merged_pd['T_C'] + 273
+    merged_pd.drop(labels='T_C', axis=1, inplace=True)
+        
+        # Combine with WISPER:
+    wisper_addvars = wisper.merge(merged_pd, on='Start_UTC', how='inner')
+
+
+    # Replace cloud h2o var with enhancement-corrected cloud water 
+    # content in units of g/m3:
+    wisper_addvars['cwc'] = cvi_cwc.cvi_cwc(
+        wisper_addvars['h2o_cld_gkg'].values, 
+        wisper_addvars['T_K'].values, 
+        wisper_addvars['P_hPa'].values*100, 
+        wisper_addvars['cvi_enhance'].values)
+    wisper_addvars.drop(labels='h2o_cld_gkg', axis=1, inplace=True)
+        
     
-    
-    return wisper_new.merge(merged_pd, on='Start_UTC', how='inner')
+    return 
 
 
 
-def wisper(date, add_cloudvars=False):
+def wisperdata(date):
     """
     Returns wisper data for a single flight. Single columns for each vapor 
     var (q, dD, d18O) where Pic1 measurements are used where available and 
     Pic2 is used otherwise. 
-    
-    Option to include cloud variables (cwc, dD, d18O).
-    
+        
     Water vars are converted to g/kg units.
     """
         
@@ -85,6 +106,7 @@ def wisper(date, add_cloudvars=False):
     wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
 
 
+    # Vapor vars
     # Get a single column for each vapor variable, filled with Pic1  
     # data where available and Pic2 otherwise:
     wisper = pd.read_csv(
@@ -105,18 +127,20 @@ def wisper(date, add_cloudvars=False):
     wisper_new.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
 
 
-    # Convert water concentration from ppmv units to g/kg.
+    # Convert water vapor from ppmv units to g/kg.
     wisper_new['h2o_gkg'] = convertq.ppmv_to_gkg(wisper_new['h2o_gkg'])
     
     
-    # Optional cloud vars:
-    if add_cloudvars:
+    # Add cloud vars:
+    if year in ['2017','2018']:
         for cloudkey in ['h2o_cld','dD_cld','d18O_cld','cvi_enhance']:
             wisper_new[cloudkey] = wisper[cloudkey]
+            
+            
+    # Convert cloud water from ppmv units to g/kg.
+    wisper_new['h2o_cld_gkg'] = convertq.ppmv_to_gkg(wisper_new['h2o_cld'])
+    wisper_new.drop(labels='h2o_cld', axis=1, inplace=True)
     
-    
-    
-
 
     return wisper_new
 
