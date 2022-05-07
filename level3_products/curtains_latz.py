@@ -19,19 +19,10 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import netCDF4 as nc # 1.3.1
-from warnings import filterwarnings
 
 # Local code:
-import wisperaddvars
+import getdata
 import oversampler
-
-
-
-## Suppress a harmless warning triggered in this script:
-filterwarnings(
-    action='ignore', category=DeprecationWarning, 
-    message='`np.bool` is a deprecated alias'
-    )
 
 
 
@@ -278,30 +269,20 @@ def get_data(year, dtblock=30, morethanx_gkg=0.2):
     data = pd.DataFrame({}) # Will hold all data.
     dates = p3_flightdates(year)
     
-    if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
-    if year == '2018': altitude_key='GPS_Altitude'
-    mergevarkeys_nc = [altitude_key, 'Latitude', 'Longitude']
-    mergevarkeys_return = ['height_m', 'lat', 'lon']
-    
     for date in dates:
 
         # WISPER data with lat, lon, height:
-        data_singleflight = wisperaddvars.data_singledate(
-            date, mergevarkeys_nc, mergevarkeys_return
-            )
+        data_singleflight = getdata.wisperaddvars(date)
         
-        # Average both datasets into time blocks:
+        # Average into time blocks:
         if dtblock is not None:
             dt = dtblock
             time_blocked = np.round(data_singleflight['Start_UTC']/dt)*dt
             data_singleflight = data_singleflight.groupby(time_blocked, as_index=False).mean()
 
-
+        # Append:
         data = data.append(data_singleflight, ignore_index=True, sort=False)
         
-    
-    data.replace(-9999, np.nan, inplace=True) # Change missing value flag.    
-
 
     # Only keep data where humidity is greater than passed value:
     data = data.loc[data['h2o_gkg']>morethanx_gkg]
@@ -338,15 +319,7 @@ def p3_flightdates(year):
                 '20181010','20181012','20181015','20181017',
                 '20181019','20181021','20181023']
     
-    
-    
-def convert_q(q):
-    """
-    Converts specific humidity from units of ppmv to g/kg.
-    """
-    return 0.622*q/1000
-
-        
+            
 
 if __name__=='__main__': 
     lev3product_allyears()
