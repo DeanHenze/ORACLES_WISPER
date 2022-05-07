@@ -34,11 +34,6 @@ def wisperaddvars(date):
     ------
     date: str.
         Flight date, 'yyyymmdd'.
-    
-    add_cloudvars: bool.
-        If True, include following WISPER cloud measurements:
-            cwc (g/kg) 
-            dD, d18O (permil)
     """
     
     year = date[0:4]
@@ -87,7 +82,7 @@ def wisperaddvars(date):
     wisper_addvars.drop(labels='h2o_cld_gkg', axis=1, inplace=True)
         
     
-    return 
+    return wisper_addvars
 
 
 
