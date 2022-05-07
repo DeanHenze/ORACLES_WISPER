@@ -23,7 +23,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 
 # Local code:
-import wisperaddvars
+import getdata
 
 
 
@@ -35,88 +35,96 @@ def vertical_profiles(year):
     Returns: xarray.dataset.
     """
 
-    ## All ORACLES flight dates to include:
-    if year == 2017:
-        dates = odl.p3_flightdates(year, return_alldates=True)
-    else:
-        dates = odl.p3_flightdates(year)
+    ## Table of vertical profiles times for the current year:
+    profiletable = pd.read_csv("./vertical_profile_times.csv").copy() # all dates.
+    profiletable['year'] = [d//10000 for d in profiletable['date']]
+    profiletable = profiletable.loc[profiletable['year']==year]
 
 
-    ## Dataframe column keys for P-3 variables to include in the profiles dataset:
+
+    ## Keys in the P-3 time series datafiles for variables that will be 
+    ## included in the final profiles dataset:
     keys_p3df = ['h2o_gkg', 'dD_permil', 'd18O_permil', 'dxs', 
                  'P_hPa', 'T_K', 'lat', 'lon']
     if year in [2017, 2018]: # Add cloud keys for these sampling periods.
-        cldkeys = ['cwc_gm3', 'dD_cld_permil', 'd18O_cld_permil', 'dxs_cld']
+        cldkeys = ['cwc', 'dD_cld', 'd18O_cld', 'dxs_cld']
         keys_p3df = keys_p3df + cldkeys
     
     
-    ## Variables to collect profile data from each flight into:
-        # (1) Dictionary to collect all 2D variables in. Initialize each entry 
-        # with an empty pd.DataFrame, with index = 50 m altitude grid levels:
+    
+    ## Objects to collect profile data from each flight into:
+        # (1) Dictionary to collect all 2D variables in (dimensions of profile 
+        # number, alt). Initialize each entry with an empty pd.DataFrame, 
+        # with index = 50 m altitude grid levels:
     alt_grid = np.arange(50, 7050, 50)
     vars2D = {}
     for k in keys_p3df: vars2D[k] = pd.DataFrame({}, index = alt_grid)
-        # (2) Lists for 1D variables:
+        # (2) Lists for 1D variables (dimension profile number):
     flightdate = []
     start_UTCsec = []
     end_UTCsec = []
     ascdesc_flag = [] # Flag for whether P-3 was ascending or descending
     
 
-    ## Load and append data for all profiles in all flights:
-    profiletable = pd.read_csv("./vertical_profile_times.csv")
-    
-    for date, rows_date in profiletable.groupby(by='date'):
-        
-        # Load WISPER data with added vars from the merge file:
-        addvarkeys_nc = []
-        data = data_singledate(date, mergevarkeys_nc, mergevarkeys_return)
 
-        
-    
-    for date in dates:
-        
-        print("Getting profiles for flight on %s" % date)
-        p3data = get_p3data(date)
-        
-        for n_prf, data_prf in p3data.groupby(by='profile'): # Cycle thru profiles.
-                
-            # Append vars from single profile to collection:
-            append_gridded_prf(data_prf[keys_p3df + ['height_m']], vars2D)    
+    ## Load and append data for all profiles in all flights:    
+    for date, rows_date in profiletable.groupby(by='date'):
+       
+        print(date) 
+       
+        # Load WISPER data with added vars from the merge file:
+        data_singledate = get_p3data(str(date))
+
+        for i, row in rows_date.iterrows(): # 1 row per profile.
             
+            # Isolate data for a single profile:
+            data_prf = data_singledate.loc[
+                (data_singledate['Start_UTC'] > row['start_utcsecs']) & 
+                (data_singledate['Start_UTC'] < row['end_utcsecs'])
+                ]
+        
+            # Append vars from profile to collection:
+            append_gridded_prf(data_prf[keys_p3df + ['height_m']], vars2D)  
+
             # Append date and start/end times:
             flightdate.append(int(date))
-            start_UTCsec.append(data_prf['time_secUTC'].iloc[0])
-            end_UTCsec.append(data_prf['time_secUTC'].iloc[-1])
+            start_UTCsec.append(data_prf['Start_UTC'].iloc[0])
+            end_UTCsec.append(data_prf['Start_UTC'].iloc[-1])
             
             # Append ascending vs. descending flag:
             dz = data_prf['height_m'].iloc[-1] - data_prf['height_m'].iloc[0]
             if dz > 0: ascdesc_flag.append(1)
             if dz < 0: ascdesc_flag.append(0)
-            
-                
+    
+
+
     ## Create xarray dataset:
         # Empty dataset with altitude and profile-number as the coords:
     n_prf = np.arange(1, len(flightdate)+1, 1) # Profile number coord.
     prfs_xrds = xr.Dataset(coords = dict(profile = n_prf, alt = alt_grid))
+        
         # Add 2D vars:
-    keys_xr2dvars = ['q', 'dD', 'd18O', 'dxs', # Keys for the 2D variables.
-                     'P', 'T', 'lat', 'lon']
-    if year in [2017, 2018]: # Add cloud keys for these sampling periods.
+    keys_xr2dvars = ['q', 'dD', 'd18O', 'dxs', # The new 2D variable keys for  
+                     'P', 'T', 'lat', 'lon']   # final dataset.
+    if year in [2017, 2018]: # Add cloud keys.
         keys_xr2dvars = keys_xr2dvars + ['cwc', 'dD_cld', 'd18O_cld', 'dxs_cld']    
+    
     for k1, k2 in zip(keys_xr2dvars, keys_p3df):
         prfs_xrds = prfs_xrds.assign(
             {k1:(["alt", "profile"], vars2D[k2].values)}
             )
+        
         # Add 1D vars:
     prfs_xrds = prfs_xrds.assign({'date':(["profile"], flightdate)})    
     prfs_xrds = prfs_xrds.assign({'t_start':(["profile"], start_UTCsec)})    
     prfs_xrds = prfs_xrds.assign({'t_end':(["profile"], end_UTCsec)})   
     prfs_xrds = prfs_xrds.assign({'asc_desc_flag':(["profile"], ascdesc_flag)})   
+        
         # Fill missing values with -9999:
     fillval = -9999
     prfs_xrds.fillna(fillval)
               
+    
     
     ## Add xarray dataset attributes:
         # global attributes:
@@ -235,40 +243,36 @@ def vertical_profiles(year):
         
 
 
-def get_p3data(date):
+#def get_p3data(date):
     """
     Load and return P-3 data, as a pd.DataFrame, for the input flight 
     date. Compute and append dxs. For 2017 and 2018 sampling periods, also 
     compute and append cloud water content.
     """
-    p3data = odl.p3_with_mixsegs(date=date) # Load P-3 data.
-    p3data['dxs'] = p3data['dD_permil'] - 8*p3data['d18O_permil']
-    if date[0:4] in ['2017','2018']:
-        p3data['cwc_gm3'] = cvi_cwc(p3data['h2o_cld_gkg'].values, 
-                                    p3data['T_K'].values, 
-                                    p3data['P_hPa'].values*100, 
-                                    p3data['cvi_enhance'].values)
-        p3data['dxs_cld'] = p3data['dD_cld_permil'] - 8*p3data['d18O_cld_permil']
-    return p3data
+#    p3data = odl.p3_with_mixsegs(date=date) # Load P-3 data.
+#    p3data['dxs'] = p3data['dD_permil'] - 8*p3data['d18O_permil']
+#    if date[0:4] in ['2017','2018']:
+#        p3data['cwc_gm3'] = cvi_cwc(p3data['h2o_cld_gkg'].values, 
+#                                    p3data['T_K'].values, 
+#                                    p3data['P_hPa'].values*100, 
+#                                    p3data['cvi_enhance'].values)
+#        p3data['dxs_cld'] = p3data['dD_cld_permil'] - 8*p3data['d18O_cld_permil']
+#    return p3data
 
 
 
 def get_p3data(date):
     """
-    Load WISPER data with added vars from the merge file:
+    Load WISPER data with added vars from the merge file. Add dxs for 
+    total and cloud water.
     """
+    data = getdata.wisperaddvars(date)
+    data['dxs'] = data['dD_permil'] - 8*data['d18O_permil']
+    if date[0:4] in ['2017','2018']:
+        data['dxs_cld'] = data['dD_cld'] - 8*data['d18O_cld']
+    return data
     
-    if year in ['2016','2017']: altitude_key='MSL_GPS_Altitude'
-    if year == '2018': altitude_key='GPS_Altitude'
-    addvarkeys_nc = [altitude_key, 'Latitude', 'Longitude', 
-                     'Static_Air_Temp', 'Static_Pressure'
-                     ]
-    varkeys_assign = ['alt', 'lat', 'lon', 'T', 'P']
-    data = wisperaddvars.data_singledate(date, addvarkeys_nc, varkeys_assign)
-
-            
-
-
+    
 
 def append_gridded_prf(single_prf_df, all_prfs_dict):
     """
@@ -295,22 +299,6 @@ def append_gridded_prf(single_prf_df, all_prfs_dict):
                         
 
     
-def cvi_cwc(q_cld, T, P, cvi_enhance):
-    """
-    Compute CVI-measured cloud water content given cloud water mixing ratio 
-    (g/kg), ambient air temperature [K], pressure [Pa], and the CVI 
-    enhancement factor. Approximate air density assuming air is completely dry.
-
-    Returns
-    -------
-    Cloud water content as a numpy array, units of g/m3.    
-    """
-    Rd = 287.1 # specific gas constant for dry air, [J/K/kg].
-    rho = P/(Rd*T) # density.
-    return q_cld*rho/cvi_enhance
-
-
-    
 if __name__ == "__main__":
     """
     Create and save profile datasets for each ORACLES year.
@@ -320,8 +308,8 @@ if __name__ == "__main__":
               "Creating ORACLES %i vertical profiles data product\n"
               "=====================================================" % year)
         profiles_xrds = vertical_profiles(year) # Profiles as xr.dataset.
-        path_save = r"../output/wisper_oracles_verticalprofiles_%i.nc" % year
-        profiles_xrds.to_netcdf(path_save, format="NETCDF4")
+        fname = r"./wisper_oracles_verticalprofiles_%i.nc" % year
+        profiles_xrds.to_netcdf(fname, format="NETCDF4")
         print("Data product created and saved")
         
         
