@@ -42,16 +42,44 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
     
     
     # Path and file info to load the datasets:
-    relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"  
-    wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
     relpath_merged = r"../apply_cal+QC/P3_merge_data/"
     merged_revnum = {'2016':'R25', '2017':'R18', '2018':'R8'}[year]
     
     
-    # WISPER data
-    #   1) Get a single column for each variable filled with Pic1 instrument 
-    #      data where available and Pic2 otherwise:
-    #   2) Convert water concentration from ppmv units to g/kg.
+    # Additional variables
+    # Load merged files as nc.Dataset object and place a subset of the 
+    # vars in a pandas df:
+    merged_nc = nc.Dataset(
+        relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
+        )
+    merged_pd = pd.DataFrame({})
+    merged_pd['Start_UTC'] = merged_nc.variables['Start_UTC'][:]
+    for knc, knew in zip(mergevarkeys_nc, mergevarkeys_return):
+        merged_pd[knew] = merged_nc.variables[knc][:]
+    
+    
+    return wisper_new.merge(merged_pd, on='Start_UTC', how='inner')
+
+
+
+def wisper_singledate(date, add_cloudvars=False):
+    """
+    Returns wisper data for a single flight. Single columns for each vapor 
+    var (q, dD, d18O) where Pic1 measurements are used where available and 
+    Pic2 is used otherwise. Option to include cloud variables (cwc, dD, d18O).
+    
+    Water vars are converted to g/kg units.
+    """
+    
+    year = date[0:4]
+    
+    # Path and file headerline info:    
+    relpath_wisper = r"../apply_cal+QC/WISPER_calibrated_data/"
+    wisper_headerline = {'2016':70, '2017':85, '2018':85}[year]
+
+
+    # Get a single column for each variable filled with Pic1 instrument 
+    # data where available and Pic2 otherwise:
     wisper = pd.read_csv(
         relpath_wisper + "WISPER_P3_%s_R2.ict" % date, 
         header=wisper_headerline
@@ -68,20 +96,19 @@ def data_singledate(date, mergevarkeys_nc, mergevarkeys_return):
             wisper_new.loc[inan, k] = wisper.loc[inan, k2].copy() # Replace with Pic2.
 
     wisper_new.columns = ['Start_UTC','h2o_gkg','dD_permil','d18O_permil']
+
+
+    # Convert water concentration from ppmv units to g/kg.
     wisper_new['h2o_gkg'] = convertq.ppmv_to_gkg(wisper_new['h2o_gkg'])
-    
-    
-    # Additional variables
-    # Load merged files as nc.Dataset object and place a subset of the 
-    # vars in a pandas df:
-    merged_nc = nc.Dataset(
-        relpath_merged + "mrg1_P3_%s_%s.nc" % tuple([date, merged_revnum])
-        )
-    merged_pd = pd.DataFrame({})
-    merged_pd['Start_UTC'] = merged_nc.variables['Start_UTC'][:]
-    for knc, knew in zip(mergevarkeys_nc, mergevarkeys_return):
-        merged_pd[knew] = merged_nc.variables[knc][:]
-    
-    
-    return wisper_new.merge(merged_pd, on='Start_UTC', how='inner')
-  
+
+
+    return wisper_new
+
+
+
+def wisperaddvars(date):
+    """
+    """
+
+
+
