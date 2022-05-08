@@ -17,8 +17,11 @@ More information on the ORACLES field experiment can be found on the
 [Redemann et al., 2021](https://doi.org/10.5194/acp-21-1507-2021).
 
 The WISPER data products provided are:
-* 1 Hz time series.
-* Mean latitude-altitude curtains providing a climatology for each IOP.  
+* 1 Hz time series (```./apply_cal+QC/WISPER_calibrated_data/```).
+* Mean latitude-altitude curtains, providing a climatology for each IOP 
+  (```./level3_products/```).
+* Individual vertical profiles averaged to 50 m altitude bins
+  (```./level3_products/```).
 
 This directory contains Python scripts to generate the data products. Calibrated 
 1 Hz time series files can be produced by running ```./apply_cal+QC/run_fullcal.py```. The 
