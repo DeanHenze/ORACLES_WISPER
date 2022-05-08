@@ -4,11 +4,8 @@ Created on Wed Feb  2 13:03:16 2022
 
 @author: Dean
 
-Create the vertical profiles dataset.
-
-
-To do:
-    - Remember to convert temperature from deg C to deg K.
+A call to main will create the vertical profiles data files for each 
+sampling period.
 """
 
 
@@ -243,24 +240,6 @@ def vertical_profiles(year):
         
 
 
-#def get_p3data(date):
-    """
-    Load and return P-3 data, as a pd.DataFrame, for the input flight 
-    date. Compute and append dxs. For 2017 and 2018 sampling periods, also 
-    compute and append cloud water content.
-    """
-#    p3data = odl.p3_with_mixsegs(date=date) # Load P-3 data.
-#    p3data['dxs'] = p3data['dD_permil'] - 8*p3data['d18O_permil']
-#    if date[0:4] in ['2017','2018']:
-#        p3data['cwc_gm3'] = cvi_cwc(p3data['h2o_cld_gkg'].values, 
-#                                    p3data['T_K'].values, 
-#                                    p3data['P_hPa'].values*100, 
-#                                    p3data['cvi_enhance'].values)
-#        p3data['dxs_cld'] = p3data['dD_cld_permil'] - 8*p3data['d18O_cld_permil']
-#    return p3data
-
-
-
 def get_p3data(date):
     """
     Load WISPER data with added vars from the merge file. Add dxs for 
@@ -311,64 +290,3 @@ if __name__ == "__main__":
         fname = r"./wisper_oracles_verticalprofiles_%i.nc" % year
         profiles_xrds.to_netcdf(fname, format="NETCDF4")
         print("Data product created and saved")
-        
-        
-        
-def test_output():
-    """
-    Rough code tests the saved data products from a call to main.
-    """
-
-    year = 2018
-    path_prf = r"../output/wisper_oracles_verticalprofiles_%i.nc" % year
-    prfs = xr.load_dataset(path_prf, decode_times=False)
-    
-    prfs = prfs.assign(mean_lat = prfs['lat'].mean(dim='alt'))
-    low_lats = prfs.where(prfs['mean_lat']<-10, drop=True)
-    mid_lats = prfs.where((prfs['mean_lat']>-10) & (prfs['mean_lat']<-7), drop=True)
-    hi_lats = prfs.where(prfs['mean_lat']>-7, drop=True)
-    plt.figure()
-    varplot = 'dxs'
-    for i in low_lats['profile']:
-        prfsingle = low_lats.sel(profile=i)
-        plt.plot(prfsingle[varplot], prfsingle['alt'], c='b')
-    for i in mid_lats['profile']:
-        prfsingle = mid_lats.sel(profile=i)
-        plt.plot(prfsingle[varplot], prfsingle['alt'], c='r')
-    for i in hi_lats['profile']:
-        prfsingle = hi_lats.sel(profile=i)
-        plt.plot(prfsingle[varplot], prfsingle['alt'], c='k')
-        
-        
-    for i in [6, 36, 52]:
-        plt.figure()
-        prfsingle = prfs.sel(profile=i)
-        ax1 = plt.axes()
-        ax1.plot(prfsingle['T'], prfsingle['alt'], 'k')
-        ax2 = ax1.twiny()
-        ax2.plot(prfsingle['d18O'], prfsingle['alt'], 'b')
-        ax3 = ax1.twiny()
-        ax3.plot(prfsingle['q'], prfsingle['alt'], 'g') 
-        
-        
-    if year != 2016:
-        plt.figure()
-        plt.hist(prfs.dD_cld.values.flatten(), histtype='step')
-        plt.hist(prfs.dD.values.flatten(), histtype='step')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
