@@ -27,5 +27,3 @@ This directory contains Python scripts to generate the data products. Calibrated
 1 Hz time series files can be produced by running ```./apply_cal+QC/run_fullcal.py```. The 
 script takes raw data from ```./apply_cal+QC/WISPER_raw_data/``` and outputs calibrated 
 files to ```./apply_cal+QC/WISPER_calibrated_data/```.
-
-Example usage and expected output... 
