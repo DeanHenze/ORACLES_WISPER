@@ -13,6 +13,8 @@ instrument, measurements, data products, and calibration procedure can be found 
 [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
 
+<p><a href="https://doi.org/10.5281/zenodo.5748368" target="_blank">zenodo</a></p>
+
 ### Background
 
 WISPER is designed to provide in-situ aircraft 
