@@ -27,7 +27,7 @@ More information on the ORACLES field experiment can be found on the
 [NASA ESPO website](https://espo.nasa.gov/oracles/content/ORACLES) and in 
 [Redemann et al., 2021](https://doi.org/10.5194/acp-21-1507-2021).
 
-### Quick Directory Guide
+### Directory Guide
 
 * Gridded products are created from the QC'd / calibrated time series files located in 
 ```./apply_cal+QC/WISPER_calibrated_data/```. The processed time series .ict files can be reproduced 
