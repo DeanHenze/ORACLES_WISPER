@@ -166,7 +166,7 @@ def crosscalibrate_h2o(wisperdata, year):
         wisperdata with the Pic2 water concentration modified in place.
     """
     # Load slope for cross-calibration line:
-    dir_pars = r"../calibration_modelling/pic2-pic1_cross-cal/"
+    dir_pars = r"../calibration_modeling/pic2-pic1_cross-cal/"
     q_xcalslopes = pd.read_csv(dir_pars + "h2o_xcal_results.csv")
     slope = q_xcalslopes.loc[q_xcalslopes['year']==year, 'slope'].values
     
@@ -199,7 +199,7 @@ def crosscalibrate_dD_d18O(wisperdata, year):
     
     # Load cross-calibration model parameters as pandas.DataFrame's and 
     # recast as dictionaries where keys are the predictor_var column:
-    dir_pars = r"../calibration_modelling/pic2-pic1_cross-cal/"
+    dir_pars = r"../calibration_modeling/pic2-pic1_cross-cal/"
     p_d18O_df = pd.read_csv(dir_pars + ("d18O_xcal_results_%i.csv" % year))
     p_dD_df = pd.read_csv(dir_pars + ("dD_xcal_results_%i.csv" % year))
     p_dD_dict = dict(zip(p_dD_df['predictor_var'], p_dD_df['coeff']))

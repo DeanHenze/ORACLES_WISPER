@@ -15,7 +15,7 @@ import os
 # Third party:
 import numpy as np # 1.19.2
 
-# My modules:
+# Local code:
 import preprocess 
 import time_sync
 import precision_columns as stdcols
@@ -23,7 +23,7 @@ import pic1_cal
 import pic2_cal
 
 
-# Paths to raw and (to-be) calibrated file directories:
+# Paths to raw and calibrated file directories:
 path_rawdir = r"./WISPER_raw_data/"
 path_caldir = r"./WISPER_calibrated_data/"
 if not os.path.exists(path_caldir): os.makedirs(path_caldir)
@@ -156,6 +156,11 @@ dates2018_good = ['20180927','20180930','20181003','20181007','20181010',
 for date in dates2016_good: calibrate_file(date)
 for date in dates2017_good: calibrate_file(date)
 for date in dates2018_good: calibrate_file(date)
+
+print("===============================\n"
+      "!!! QC / Calibration complete !!!\n"
+      "==============================="
+      )
 
 
 
