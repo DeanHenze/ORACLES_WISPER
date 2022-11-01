@@ -1,4 +1,4 @@
-# WISPER ORACLES \n data products and processing code
+## WISPER ORACLES data products and processing code
 **WISPER: Water Isotope System for Precipitation and Entrainment Research**
 
 **ORACLES: ObseRvations of Aerosols above CLouds and their intEractionS** ![test embed](./NASA_ORACLES_logo.png)
@@ -10,7 +10,7 @@ instrument, measurements, data products, and calibration procedure can be found 
 [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
 
-## Background
+### Background
 
 WISPER is designed to provide in-situ aircraft 
 measurements of atmospheric water concentration and its heavy isotope ratios D/H and 
@@ -24,7 +24,7 @@ More information on the ORACLES field experiment can be found on the
 [NASA ESPO website](https://espo.nasa.gov/oracles/content/ORACLES) and in 
 [Redemann et al., 2021](https://doi.org/10.5194/acp-21-1507-2021).
 
-## Quick Directory Guide
+### Quick Directory Guide
 
 * Gridded products are created from the QC'd / calibrated time series files located in 
 ```./apply_cal+QC/WISPER_calibrated_data/```. The processed time series .ict files can be reproduced 
