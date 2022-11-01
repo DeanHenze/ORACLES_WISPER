@@ -1,7 +1,10 @@
 ## WISPER ORACLES data products and processing code
+
 **WISPER: Water Isotope System for Precipitation and Entrainment Research**
 
-**ORACLES: ObseRvations of Aerosols above CLouds and their intEractionS** ![test embed](./NASA_ORACLES_logo.png)
+**ORACLES: ObseRvations of Aerosols above CLouds and their intEractionS** 
+
+![test embed](./NASA_ORACLES_logo.png)
 
 Processing code to create calibrated time series files and gridded level 3 products from the WISPER 
 system during the NASA ORACLES field campaign. Files and a quick explanation of the gridded products are 
