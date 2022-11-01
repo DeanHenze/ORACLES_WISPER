@@ -7,7 +7,7 @@ Processing code to create calibrated time series files and gridded level 3 produ
 system during the NASA ORACLES field campaign. Files and a quick explanation of the gridded products are 
 available on [zenodo](https://doi.org/10.5281/zenodo.5748368). A detailed review of the 
 instrument, measurements, data products, and calibration procedure can be found in 
-[Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022). The paper is also included in this 
+[Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
 
 ## Background
