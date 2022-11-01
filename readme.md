@@ -40,4 +40,8 @@ averaged to 50 m resolution for each sampling period (```./level3_products/wispe
 They can be reproduced by running ```python ./level3_products/curtains_latz.py``` and 
 ```python ./level3_products/vertical_profiles.py```, respectively.
 
+* Parameter fits to the uncertainty function (see [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022), 
+Section 5.4), are reproduced by running ```python ./apply_cal+QC/uncertainty_estimation.py``` and the results are 
+stored in ```./apply_cal+QC/uncertainty_params.csv```.
+
 * Raw time series data are located in ```./apply_cal+QC/WISPER_raw_data/```.
