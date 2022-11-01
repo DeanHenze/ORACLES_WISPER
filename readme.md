@@ -7,11 +7,18 @@
 ![test embed](./NASA_ORACLES_logo.png)
 
 Processing code to create calibrated time series files and gridded level 3 products from the WISPER 
-system during the NASA ORACLES field campaign. Files and a quick explanation of the gridded products are 
+system during the NASA ORACLES field campaign. Data files and a quick explanation of the gridded products are 
 available on [zenodo](https://doi.org/10.5281/zenodo.5748368). A detailed review of the 
 instrument, measurements, data products, and calibration procedure can be found in 
 [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
+
+### !!Heads up!!
+Several data file folders required to generate the calibrated time series data are not in this GitHub repo due to larger storage needs, 
+contact deanchenze@gmail.com to obtain them:
+* ```./apply_cal+QC/WISPER_raw_data/```
+* ```./apply_cal+QC/outlier_time_intervals/```
+* ```./apply_cal+QC/P3_merge_data/```
 
 ### Background
 
