@@ -13,6 +13,6 @@ The WISPER processing and calibration procedure is broadly:
 ### !! Additional Folders Required !!
 This repo includes all necessary processing scripts. However, several folders containing the data files needed to reproduce the calibrated 
 time series are not in this GitHub repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
-* ```./apply_cal+QC/WISPER_raw_data/```
-* ```./apply_cal+QC/outlier_time_intervals/```
-* ```./apply_cal+QC/P3_merge_data/```
+* ```./WISPER_raw_data/```
+* ```./outlier_time_intervals/```
+* ```./P3_merge_data/```
