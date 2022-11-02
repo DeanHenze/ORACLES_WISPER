@@ -13,7 +13,7 @@ instrument, measurements, data products, and calibration procedure can be found 
 [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
 
-### !!Heads up!!
+### !! Additional Folders Required !!
 Several data file folders needed to generate the calibrated time series data are not in this GitHub 
 repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
 * ```./apply_cal+QC/WISPER_raw_data/```
