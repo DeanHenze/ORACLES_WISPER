@@ -14,8 +14,8 @@ instrument, measurements, data products, and calibration procedure can be found 
 directory (```essd-14-1811-2022.pdf```).
 
 ### !!Heads up!!
-Several data file folders required to generate the calibrated time series data are not in this GitHub repo due to larger storage needs, 
-contact deanchenze@gmail.com to obtain them:
+Several data file folders needed to generate the calibrated time series data are not in this GitHub 
+repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
 * ```./apply_cal+QC/WISPER_raw_data/```
 * ```./apply_cal+QC/outlier_time_intervals/```
 * ```./apply_cal+QC/P3_merge_data/```
@@ -36,17 +36,16 @@ More information on the ORACLES field experiment can be found on the
 
 ### Directory Guide
 
-* Gridded products are created from the QC'd / calibrated time series files located in 
+* Gridded products are created from the QC'd / calibrated time series .ict files located in 
 ```./apply_cal+QC/WISPER_calibrated_data/```. The processed time series .ict files can be reproduced 
-by running ```python ./apply_cal+QC/run_fullcal.py```. All processing code for the time series files 
-are located in ```./apply_cal+QC/```.
+by running ```python run_fullcal.py``` from within the folder ```./apply_cal+QC/```.
 
 * The gridded products (netCDF) include mean latitude-altitude curtains for each sampling period 
 (```./level3_products/wisper_oracles_curtains_*.nc```) and individual vertical profiles 
 averaged to 50 m resolution for each sampling period (```./level3_products/wisper_oracles_verticalprofiles_*.nc```). 
-They can be reproduced by running ```python ./level3_products/curtains_latz.py``` and 
-```python ./level3_products/vertical_profiles.py```, respectively.
+They can be reproduced by running ```python curtains_latz.py``` and 
+```python vertical_profiles.py```, respectively, from within the folder ```./level3_products/```.
 
 * Parameter fits to the uncertainty function (see [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022), 
-Section 5.4), are reproduced by running ```python ./apply_cal+QC/uncertainty_estimation.py``` and the results are 
-stored in ```./apply_cal+QC/uncertainty_params.csv```.
+Section 5.4), are reproduced by running ```python uncertainty_estimation.py``` from within the folder ```./apply_cal+QC/``` 
+and the results are stored in ```./apply_cal+QC/uncertainty_params.csv```.
