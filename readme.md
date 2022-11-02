@@ -44,8 +44,8 @@ Section 5.4), are reproduced by running ```python uncertainty_estimation.py``` f
 and the results are stored in ```./apply_cal+QC/uncertainty_params.csv```.
 
 ### !! Additional Folders Required !!
-Several data file folders needed to generate the calibrated time series data are not in this GitHub 
-repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
+This repo includes all necessary processing scripts. However, several folders containing the data files needed to reproduce the calibrated 
+time series are not in this GitHub repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
 * ```./apply_cal+QC/WISPER_raw_data/```
 * ```./apply_cal+QC/outlier_time_intervals/```
 * ```./apply_cal+QC/P3_merge_data/```
