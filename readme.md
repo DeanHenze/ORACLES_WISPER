@@ -13,13 +13,6 @@ instrument, measurements, data products, and calibration procedure can be found 
 [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022) which is also included in this 
 directory (```essd-14-1811-2022.pdf```).
 
-### !! Additional Folders Required !!
-Several data file folders needed to generate the calibrated time series data are not in this GitHub 
-repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
-* ```./apply_cal+QC/WISPER_raw_data/```
-* ```./apply_cal+QC/outlier_time_intervals/```
-* ```./apply_cal+QC/P3_merge_data/```
-
 ### Background
 
 WISPER is designed to provide in-situ aircraft 
@@ -49,3 +42,10 @@ They can be reproduced by running ```python curtains_latz.py``` and
 * Parameter fits to the uncertainty function (see [Henze et al., 2022](https://doi.org/10.5194/essd-14-1811-2022), 
 Section 5.4), are reproduced by running ```python uncertainty_estimation.py``` from within the folder ```./apply_cal+QC/``` 
 and the results are stored in ```./apply_cal+QC/uncertainty_params.csv```.
+
+### !! Additional Folders Required !!
+Several data file folders needed to generate the calibrated time series data are not in this GitHub 
+repo due to larger storage requirements, contact deanchenze@gmail.com to obtain them:
+* ```./apply_cal+QC/WISPER_raw_data/```
+* ```./apply_cal+QC/outlier_time_intervals/```
+* ```./apply_cal+QC/P3_merge_data/```
