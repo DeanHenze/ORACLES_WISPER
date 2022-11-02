@@ -4,7 +4,7 @@
 
 **ORACLES: ObseRvations of Aerosols above CLouds and their intEractionS** 
 
-![nasa logo](./NASA_ORACLES_logo.png)!   [curtain sample](./dD_curtain_sample.png) 
+![nasa logo](./NASA_ORACLES_logo.png)   ![curtain sample](./dD_curtain_sample.png) 
 
 Processing code to create calibrated time series files and gridded level 3 products from the WISPER 
 system during the NASA ORACLES field campaign. Data files and a brief explanation of the gridded products are 
