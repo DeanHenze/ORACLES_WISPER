@@ -1,8 +1,17 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov  2 15:51:53 2022
+
+@author: Dean
+
+Tests if the wisper_oracles_curtains_*.nc files were succesfully created. 
+Plot curtains with standard deviations for specific humidity and isotope ratios.
+"""
+
 
 
 import numpy as np
 import xarray as xr
-import netCDF4 as nc # 1.3.1
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap as linsegcmap
 
