@@ -30,11 +30,16 @@ More information on the ORACLES field experiment can be found on the
 ### Creating and testing the data products
 
 * First, the raw time series files must be QC'd and calibrated. From a terminal in the top directory run:
+
 ```cd apply_cal+QC/```
+
 ```python run_fullcal.py```
 * Next, create the gridded products from the processed time series:
+
 ```cd ../level3_products/```
+
 ```python curtains_latz.py```
+
 ```python vertical_profiles.py```
 
 ### Directory Guide
