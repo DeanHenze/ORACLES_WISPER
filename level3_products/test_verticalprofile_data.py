@@ -69,7 +69,7 @@ axset[0,3].set_yticks([])
 
 axset[1,0].set_ylabel('altitude (km)', fontsize=14)
 plt_xlabels = ['T (K)', 'P (hPa)', 'q (q/kg)', 
-               'cwc (g/m3)', 'dD'+u' (\u2030)', 'd18O'+u' (\u2030)']
+               'cwc (g/m3)', r'$\delta$D'+u' (\u2030)', 'd18O'+u' (\u2030)']
 for ax, lab in zip(axset[2,:], plt_xlabels):
     ax.set_xlabel(lab, fontsize=14)
     
