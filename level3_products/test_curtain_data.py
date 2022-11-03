@@ -175,4 +175,4 @@ for ax in axes[:,2]: ax.set_xlim(-14, 1)
 
 
 
-fig.savefig('curtains_verification_test.png')
+fig.savefig('verification_curtains_test.png')

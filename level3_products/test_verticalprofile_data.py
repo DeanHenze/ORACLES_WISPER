@@ -72,7 +72,8 @@ for ax, lab in zip(axset[2,:], plt_xlabels):
     
 
 axset[0,3].text(0.5, 0.5, 'No cwc data \nfor 2016 IOP', 
-                fontsize=12, va='center', ha='center', transform=ax.transAxes)
+                fontsize=12, va='center', ha='center', 
+                transform=axset[0,3].transAxes)
 
 
 axset[0,-1].text(
@@ -88,3 +89,7 @@ axset[2,-1].text(
     rotation=270, fontsize=16, transform=axset[2,-1].transAxes
     )
 ##-----------------------------------------------------------------------------
+
+
+
+fig.savefig('verification_verticalprofiles_test.png')
