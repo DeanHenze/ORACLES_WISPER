@@ -64,6 +64,9 @@ for pnum in prfs2018['profile']:
 axset[2,0].set_xlim(260, 305)
 
 
+axset[0,3].set_yticks([])
+
+
 axset[1,0].set_ylabel('altitude (km)', fontsize=14)
 plt_xlabels = ['T (K)', 'P (hPa)', 'q (q/kg)', 
                'cwc (g/m3)', 'dD'+u' (\u2030)', 'd18O'+u' (\u2030)']
