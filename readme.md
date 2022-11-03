@@ -27,6 +27,16 @@ More information on the ORACLES field experiment can be found on the
 [NASA ESPO website](https://espo.nasa.gov/oracles/content/ORACLES) and in 
 [Redemann et al., 2021](https://doi.org/10.5194/acp-21-1507-2021).
 
+### Creating and testing the data products
+
+* First, the raw time series files must be QC'd and calibrated. From a terminal in the top directory run:
+```cd apply_cal+QC/```
+```python run_fullcal.py```
+* Next, create the gridded products from the processed time series:
+```cd ../level3_products/```
+```python curtains_latz.py```
+```python vertical_profiles.py```
+
 ### Directory Guide
 
 * Gridded products are created from the QC'd / calibrated time series .ict files located in 
