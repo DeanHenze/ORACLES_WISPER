@@ -34,6 +34,7 @@ More information on the ORACLES field experiment can be found on the
 ```cd apply_cal+QC/```
 
 ```python run_fullcal.py```
+
 * Next, create the gridded products from the processed time series:
 
 ```cd ../level3_products/```
@@ -41,6 +42,16 @@ More information on the ORACLES field experiment can be found on the
 ```python curtains_latz.py```
 
 ```python vertical_profiles.py```
+
+* Check that the gridded products were created successfully by running:
+
+```python verify_verticalprofile_data.py```
+
+```python verify_curtain_data.py```
+
+and verifying that the generated images in ```verification_verticalprofiles_test.png```
+and ```verification_curtains_test.png``` match those in ```verification_verticalprofiles_ref.png```
+and ```verification_curtains_ref.png```, respectively.
 
 ### Directory Guide
 
