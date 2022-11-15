@@ -5,9 +5,12 @@ Created on Mon Mar 22 13:48:57 2021
 @author: Dean
 
 
-Make latitude-altitude curtains of humidity, dD, and dxs for each ORACLES 
-year. Curtains are made using kernel density estimation with a gaussian 
-weighting.
+Creates 2D gridded (latitude-altitude 'curtains') data products for humidity, dD, and dxs, 
+for each ORACLES year. Curtains are saved as .nc files. 
+
+Call to main will produce the .nc files.
+
+Curtains are generated using kernel density estimation with a gaussian weighting.
 """
 
 

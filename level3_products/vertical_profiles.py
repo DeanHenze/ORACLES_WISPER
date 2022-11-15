@@ -4,8 +4,10 @@ Created on Wed Feb  2 13:03:16 2022
 
 @author: Dean
 
-A call to main will create the vertical profiles data files for each 
-sampling period.
+Creates gridded vertical profiles data products. Saves results as 
+a .nc file for each ORACLES sampling period.
+
+A call to main will create the .nc files.
 """
 
 
